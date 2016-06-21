@@ -283,6 +283,42 @@
                             });
                        }));
         }
+
+        if ("amp" in unsafeWindow && !unsafeWindow.amp.INJECTED) {
+            inject("amp", function() {
+                function show_amp_source(sourceobj) {
+                    if ("protectionInfo" in sourceobj) {
+                        console.log("[amp] Cannot decode protection info");
+                    }
+                    if ("src" in sourceobj)
+                       show_url("amp", sourceobj.src);
+                }
+
+                if (arguments.length >= 2 && typeof arguments[1] === "object") {
+                    if ("sourceList" in arguments[1]) {
+                        for (var i = 0; i < arguments[1].sourceList.length; i++) {
+                            show_amp_source(arguments[1].sourceList[i]);
+                        }
+                    }
+                }
+
+                var result = oldvariable.apply(this, arguments);
+
+                if (!result)
+                    return result;
+
+                var old_amp_src = result.src;
+                result.src = function() {
+                    for (var i = 0; i < arguments[0].length; i++) {
+                        show_amp_source(arguments[0][i]);
+                    }
+
+                    return old_amp_src.apply(this, arguments);
+                };
+
+                return result;
+            });
+        }
     }
 
     i2d_main();
