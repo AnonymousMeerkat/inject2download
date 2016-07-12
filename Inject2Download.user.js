@@ -430,4 +430,51 @@
     window.addEventListener("afterscriptexecute", function(e) {
       i2d_main(e.target);
     });
+
+    document.addEventListener("DOMContentLoaded", function() {
+        var get_raws = function() {
+            var audios = [].slice.call(document.getElementsByTagName("audio"));
+            var videos = [].slice.call(document.getElementsByTagName("video"));
+            var els = Array.concat(audios, videos);
+
+            for (var i = 0; i < els.length; i++) {
+                var basename = "raw ";
+                var el = els[i];
+
+                if (el.tagName.toLowerCase() === "video") {
+                    basename += "video";
+                } else {
+                    basename += "audio";
+                }
+
+                if (el.id)
+                    basename += ": #" + el.id;
+
+                var show_updates = function() {
+                    if (el.src)
+                        i2d_show_url(basename, el.src);
+
+                    for (var x = 0; x < el.children.length; x++) {
+                        if (els[i].children[x].tagName.toLowerCase() !== "source") {
+                            continue;
+                        }
+
+                        var type = null;
+                        if (el.children[x].type)
+                            type = el.children[x].type;
+
+                        if (el.children[x].src)
+                            i2d_show_url(basename, el.children[x].src, type);
+                    }
+                };
+
+                var observer = new MutationObserver(show_updates);
+                observer.observe(el, { attributes: true, childList: true });
+
+                show_updates();
+            }
+        };
+        add_script(i2d_show_url.toString() + "\n" +
+                  "(" + get_raws.toString() + ")();");
+    });
 })();
