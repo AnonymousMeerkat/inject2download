@@ -13,9 +13,12 @@
     "use strict";
 
     // Helper functions
-    function show_url(namespace, url, description) {
+    function i2d_show_url(namespace, url, description) {
         if (!description)
             description = "";
+
+        if (typeof url !== "string" || url.replace("\s", "").length === 0)
+            return;
 
         if (!("i2d_url_list" in window))
             window.i2d_url_list = [];
@@ -34,7 +37,7 @@
 
         var text = "[" + namespace + "] " + description + ": ";
 
-        console.log(text + newurl);
+        console.log("[i2d] " + text + newurl);
 
         var el = document.getElementById("i2d-popup");
         if (!el) {
@@ -83,10 +86,13 @@
         }
     }
 
-    function inject(variable, newvalue) {
+    function inject(variable, newvalue, aliases) {
         console.log("[i2d] injecting " + variable);
-        add_script(show_url.toString() + "\n" +
-                   "if (!(" + variable + ".INJECTED)) {\n" +
+        if (!aliases)
+            aliases = [];
+
+        add_script(i2d_show_url.toString() + "\n" +
+                   "if (!(window." + variable + ".INJECTED)) {\n" +
                    "var oldvariable = window." + variable + ";\n" +
                    "var oldvariable_keys = Object.keys(oldvariable);\n" +
                    "window." + variable + " = " + newvalue.toString() + ";\n" +
@@ -94,6 +100,51 @@
                    "    window." + variable + "[oldvariable_keys[i]] = oldvariable[oldvariable_keys[i]];\n" +
                    "}\n" +
                    "window." + variable + ".INJECTED = true;\n" +
+                   "var aliases = " + JSON.stringify(aliases) + ";\n" +
+                   "for (var i = 0; i < aliases.length; i++) {\n" +
+                   "    if (aliases[i] in window && window[aliases[i]] == oldvariable)" +
+                   "        window[aliases[i]] = window." + variable + "\n" +
+                   "}\n" +
+                   "}");
+    }
+
+    function inject_jquery_base() {
+        console.log("[i2d] injecting jquery base function");
+        add_script("window.i2d_jquery_plugins = {};");
+        inject("jQuery", function() {
+            var result = oldvariable.apply(this, arguments);
+
+            var keys = Object.keys(i2d_jquery_plugins);
+            for (var i = 0; i < keys.length; i++) {
+                if (!(keys[i] in result))
+                    continue;
+
+                (function() {
+                    var ourkey = keys[i];
+
+                    var old_plugin = result[ourkey];
+                    var old_plugin_keys = Object.keys(old_plugin);
+
+                    result[ourkey] = function() {
+                        return window.i2d_jquery_plugins[ourkey].call(this, old_plugin, arguments);
+                    };
+
+                    for (var x = 0; x < old_plugin_keys.length; x++) {
+                        result[keys[i]][old_plugin_keys[x]] = old_plugin[old_plugin_keys[x]];
+                    }
+                })();
+            }
+
+            return result;
+        }, ["$"]);
+    }
+
+    function inject_jquery_plugin(name, value) {
+        console.log("[i2d] injecting jquery plugin " + name);
+
+        add_script(i2d_show_url.toString() +
+                   "if (!(" + JSON.stringify(name) + " in i2d_jquery_plugins)) {\n" +
+                   "i2d_jquery_plugins[" + JSON.stringify(name) + "] = " + value.toString() + ";\n" +
                    "}");
     }
 
@@ -111,9 +162,9 @@
         if ("soundManager" in unsafeWindow && !unsafeWindow.soundManager.INJECTED) {
             inject("soundManager.createSound", function(arg1, arg2) {
                 if (typeof arg1 === "string")
-                    show_url("soundManager", arg2);
+                    i2d_show_url("soundManager", arg2);
                 else
-                    show_url("soundManager", arg1.url);
+                    i2d_show_url("soundManager", arg1.url);
 
                 return oldvariable.apply(this, arguments);
             });
@@ -128,17 +179,17 @@
                     if (typeof arguments[0] === "object") {
                         var x = arguments[0];
                         if ("file" in x) {
-                            show_url("jwplayer", x.file);
+                            i2d_show_url("jwplayer", x.file);
                         }
                         if ("streamer" in x) {
-                            show_url("jwplayer", x.streamer, "stream");
+                            i2d_show_url("jwplayer", x.streamer, "stream");
                         }
                         if ("modes" in x) {
                             for (var i = 0; i < x.modes.length; i++) {
                                 // TODO: support more?
                                 if ("type" in x.modes[i] && x.modes[i].type === "html5") {
                                     if ("config" in x.modes[i] && "file" in x.modes[i].config) {
-                                        show_url("jwplayer", x.modes[i].config.file);
+                                        i2d_show_url("jwplayer", x.modes[i].config.file);
                                     }
                                 }
                             }
@@ -152,13 +203,13 @@
                                             continue;
 
                                         if ("label" in x.sources[i])
-                                            show_url("jwplayer", x.sources[i].file, x.sources[i].label);
+                                            i2d_show_url("jwplayer", x.sources[i].file, x.sources[i].label);
                                         else
-                                            show_url("jwplayer", x.sources[i].file);
+                                            i2d_show_url("jwplayer", x.sources[i].file);
                                     }
                                 } else {
                                     if ("file" in x.sources)
-                                        show_url("jwplayer", x.sources.file);
+                                        i2d_show_url("jwplayer", x.sources.file);
                                 }
                             }
                         }
@@ -182,7 +233,7 @@
             inject("flowplayer", function() {
                 if (arguments.length >= 3 && typeof arguments[2] === "object") {
                     if ("clip" in arguments[2] && "url" in arguments[2].clip) {
-                        show_url("flowplayer", arguments[2].clip.url);
+                        i2d_show_url("flowplayer", arguments[2].clip.url);
                     }
                     if ("playlist" in arguments[2] && arguments[2].playlist instanceof Array) {
                         for (var i = 0; i < arguments[2].playlist.length; i++) {
@@ -190,7 +241,7 @@
                                 var oururl = arguments[2].playlist[i].url;
 
                                 if (!oururl.match(/\.xml$/))
-                                    show_url("flowplayer", oururl);
+                                    i2d_show_url("flowplayer", oururl);
                             }
                             if ("bitrates" in arguments[2].playlist[i]) {
                                 var bitrates = arguments[2].playlist[i].bitrates;
@@ -206,7 +257,7 @@
                                         if (bitrates[j].bitrate)
                                             description += bitrates[j].bitrate;
 
-                                        show_url("flowplayer", bitrates[j].url, description);
+                                        i2d_show_url("flowplayer", bitrates[j].url, description);
                                     }
                                 }
                             }
@@ -222,7 +273,7 @@
                 var old_fplayer_addclip = result.addClip;
                 result.addClip = function() {
                     if (arguments.length > 0 && typeof arguments[0] === "object" && "url" in arguments[0])
-                      show_url("flowplayer", arguments[0].url);
+                      i2d_show_url("flowplayer", arguments[0].url);
 
                     return old_fplayer_addclip.apply(this, arguments);
                 };
@@ -241,13 +292,13 @@
 
                     if (my_el) {
                         if (my_el.src) {
-                           show_url("videojs", my_el.src);
+                           i2d_show_url("videojs", my_el.src);
                         }
 
                         for (var i = 0; i < my_el.children.length; i++) {
                             if (my_el.children[i].tagName.toLowerCase() === "source") {
                                 if (my_el.children[i].src) {
-                                    show_url("videojs", my_el.children[i].src, my_el.children[i].getAttribute("label"));
+                                    i2d_show_url("videojs", my_el.children[i].src, my_el.children[i].getAttribute("label"));
                                 }
                             }
                         }
@@ -260,7 +311,7 @@
                 result.src = function() {
                     if (arguments.length > 0 && typeof arguments[0] === "object") {
                         if ("src" in arguments[0]) {
-                            show_url("videojs", arguments[0].src);
+                            i2d_show_url("videojs", arguments[0].src);
                         }
                     }
 
@@ -270,7 +321,7 @@
                 return result;
             });
 
-            add_script(show_url.toString() +
+            add_script(i2d_show_url.toString() +
                        get_script_str(function() {
                             document.addEventListener("DOMContentLoaded", function() {
                                 var els = document.getElementsByClassName("video-js");
@@ -281,13 +332,13 @@
                                             continue;
                                         }
                                         if (my_el.src) {
-                                           show_url("videojs", my_el.src);
+                                           i2d_show_url("videojs", my_el.src);
                                         }
 
                                         for (var i = 0; i < my_el.children.length; i++) {
                                             if (my_el.children[i].tagName.toLowerCase() === "source") {
                                                 if (my_el.children[i].src) {
-                                                    show_url("videojs", my_el.children[i].src, my_el.children[i].getAttribute("label"));
+                                                    i2d_show_url("videojs", my_el.children[i].src, my_el.children[i].getAttribute("label"));
                                                 }
                                             }
                                         }
@@ -304,7 +355,7 @@
                         console.log("[amp] Cannot decode protection info");
                     }
                     if ("src" in sourceobj)
-                       show_url("amp", sourceobj.src);
+                       i2d_show_url("amp", sourceobj.src);
                 }
 
                 if (arguments.length >= 2 && typeof arguments[1] === "object") {
@@ -335,11 +386,42 @@
 
         if (window.location.host.search("forvo") >= 0 && "createAudioObject" in unsafeWindow && !unsafeWindow.createAudioObject.INJECTED) {
             inject("createAudioObject", function(id, mp3, ogg) {
-                show_url("forvo", mp3, "mp3");
-                show_url("forvo", ogg, "ogg");
+                i2d_show_url("forvo", mp3, "mp3");
+                i2d_show_url("forvo", ogg, "ogg");
 
                 return oldvariable.apply(this, arguments);
             });
+        }
+
+        if ("jQuery" in unsafeWindow) {
+            if (!unsafeWindow.jQuery.INJECTED) {
+                inject_jquery_base();
+            }
+
+            if (unsafeWindow.jQuery.fn.jPlayer && !("jPlayer" in unsafeWindow.i2d_jquery_plugins)) {
+                inject_jquery_plugin("jPlayer", function(orig, args) {
+                    if (args.length > 0 && args[0] === "setMedia") {
+                        if (args.length > 1) {
+                            if (typeof args[1] === "object") {
+                                for (var i in args[1]) {
+                                    if (i === "title" ||
+                                        i === "duration" ||
+                                        i === "track" /* for now */ ||
+                                        i === "artist" ||
+                                        i === "free")
+                                        continue;
+
+                                    i2d_show_url("jPlayer", args[1][i], i);
+                                }
+                            } else if (typeof args[1] === "string") {
+                                i2d_show_url("jPlayer", args[1]);
+                            }
+                        }
+                    }
+
+                    return orig.apply(this, args);
+                })
+            }
         }
     }
 
