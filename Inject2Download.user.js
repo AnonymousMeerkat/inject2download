@@ -17,6 +17,19 @@
         if (!description)
             description = "";
 
+        if (!("i2d_url_list" in window))
+            window.i2d_url_list = [];
+
+        for (var i = 0; i < i2d_url_list.length; i++) {
+            if (i2d_url_list[i][0] === namespace &&
+                i2d_url_list[i][1] === url &&
+                i2d_url_list[i][2] === description)
+                    return;
+        }
+
+
+        i2d_url_list.push([namespace, url, description]);
+
         var newurl = decodeURIComponent(url);
 
         var text = "[" + namespace + "] " + description + ": ";
@@ -317,6 +330,15 @@
                 };
 
                 return result;
+            });
+        }
+
+        if (window.location.host.search("forvo") >= 0 && "createAudioObject" in unsafeWindow && !unsafeWindow.createAudioObject.INJECTED) {
+            inject("createAudioObject", function(id, mp3, ogg) {
+                show_url("forvo", mp3, "mp3");
+                show_url("forvo", ogg, "ogg");
+
+                return oldvariable.apply(this, arguments);
             });
         }
     }
