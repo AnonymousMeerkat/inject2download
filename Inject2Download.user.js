@@ -257,6 +257,82 @@
 
         if ("flowplayer" in unsafeWindow && !unsafeWindow.flowplayer.INJECTED) {
             inject("flowplayer", function() {
+                var obj_baseurl = null;
+
+                function get_url(x) {
+                    if (obj_baseurl) {
+                        if (x.match(/^[a-z]*:\/\//))
+                            return x;
+                        else
+                            return obj_baseurl + "/" + x;
+                    } else {
+                        return x;
+                    }
+                };
+
+                function check_sources(x, label) {
+                    if (typeof x === "string") {
+                        if (!x.match(/\.xml$/))
+                            i2d_show_url("flowplayer", get_url(x), label);
+
+                        return;
+                    }
+
+                    if (x instanceof Array) {
+                        for (var i = 0; i < x.length; i++) {
+                            check_sources(x[i], label);
+                        }
+                        return;
+                    }
+
+                    if (typeof x !== "object")
+                        return;
+
+                    label = "";
+
+                    if ("title" in x)
+                        label += "[" + x.title + "]";
+
+                    if ("clip" in x) {
+                        if ("baseUrl" in x.clip)
+                            obj_baseurl = x.clip.baseUrl;
+
+                        check_sources(x.clip, label);
+                    }
+
+                    if ("playlist" in x) {
+                        check_sources(x.playlist, label);
+                    }
+
+                    if ("url" in x) {
+                        check_sources(x.url, label);
+                    }
+
+                    if ("bitrates" in x) {
+                        for (var j = 0; j < x.bitrates.length; j++) {
+                            if ("url" in x.bitrates[j]) {
+                                var description = "";
+                                if (x.bitrates[j].isDefault)
+                                    description += "default:";
+                                if (x.bitrates[j].sd)
+                                    description += "sd:";
+                                if (x.bitrates[j].hd)
+                                    description += "hd:";
+                                if (x.bitrates[j].bitrate)
+                                    description += x.bitrates[j].bitrate;
+
+                                i2d_show_url("flowplayer", get_url(x.bitrates[j].url), description);
+                            }
+                        }
+                    }
+                }
+
+                if (arguments.length >= 3 && typeof arguments[2] === "object") {
+                    check_sources(arguments[2]);
+                } else if (arguments.length >= 3 && typeof arguments[2] === "string") {
+                    i2d_show_url("flowplayer", get_url(arguments[2]));
+                }
+
                 (function() {
                     if (arguments.length >= 1) {
                         var els = [null];
@@ -279,77 +355,11 @@
 
                             var href = els[i].getAttribute("href");
                             if (href) {
-                                i2d_show_url("flowplayer", href, "href");
+                                i2d_show_url("flowplayer", get_url(href), "href");
                             }
                         }
                     }
                 }).apply(this, arguments);
-
-                function check_sources(x, label, baseurl) {
-                    if (typeof x === "string") {
-                        if (baseurl)
-                            x = baseurl + "/" + x;
-
-                        if (!x.match(/\.xml$/))
-                            i2d_show_url("flowplayer", x, label);
-
-                        return;
-                    }
-
-                    if (x instanceof Array) {
-                        for (var i = 0; i < x.length; i++) {
-                            check_sources(x[i], label, baseurl);
-                        }
-                        return;
-                    }
-
-                    if (typeof x !== "object")
-                        return;
-
-                    label = "";
-
-                    if ("title" in x)
-                        label += "[" + x.title + "]";
-
-                    if ("clip" in x) {
-                        if ("baseUrl" in x.clip)
-                            baseurl = x.clip.baseUrl;
-
-                        check_sources(x.clip, label, baseurl);
-                    }
-
-                    if ("playlist" in x) {
-                        check_sources(x.playlist, label, baseurl);
-                    }
-
-                    if ("url" in x) {
-                        check_sources(x.url, label, baseurl);
-                    }
-
-                    if ("bitrates" in x) {
-                        for (var j = 0; j < x.bitrates.length; j++) {
-                            if ("url" in x.bitrates[j]) {
-                                var description = "";
-                                if (x.bitrates[j].isDefault)
-                                    description += "default:";
-                                if (x.bitrates[j].sd)
-                                    description += "sd:";
-                                if (x.bitrates[j].hd)
-                                    description += "hd:";
-                                if (x.bitrates[j].bitrate)
-                                    description += x.bitrates[j].bitrate;
-
-                                i2d_show_url("flowplayer", x.bitrates[j].url, description);
-                            }
-                        }
-                    }
-                }
-
-                if (arguments.length >= 3 && typeof arguments[2] === "object") {
-                    check_sources(arguments[2]);
-                } else if (arguments.length >= 3 && typeof arguments[2] === "string") {
-                    i2d_show_url("flowplayer", arguments[2]);
-                }
 
                 var result = oldvariable.apply(this, arguments);
 
