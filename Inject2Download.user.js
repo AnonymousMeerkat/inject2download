@@ -257,38 +257,98 @@
 
         if ("flowplayer" in unsafeWindow && !unsafeWindow.flowplayer.INJECTED) {
             inject("flowplayer", function() {
-                if (arguments.length >= 3 && typeof arguments[2] === "object") {
-                    if ("clip" in arguments[2] && "url" in arguments[2].clip) {
-                        i2d_show_url("flowplayer", arguments[2].clip.url);
-                    }
-                    if ("playlist" in arguments[2] && arguments[2].playlist instanceof Array) {
-                        for (var i = 0; i < arguments[2].playlist.length; i++) {
-                            if ("url" in arguments[2].playlist[i]) {
-                                var oururl = arguments[2].playlist[i].url;
+                (function() {
+                    if (arguments.length >= 1) {
+                        var els = [null];
 
-                                if (!oururl.match(/\.xml$/))
-                                    i2d_show_url("flowplayer", oururl);
-                            }
-                            if ("bitrates" in arguments[2].playlist[i]) {
-                                var bitrates = arguments[2].playlist[i].bitrates;
-                                for (var j = 0; j < bitrates.length; j++) {
-                                    if ("url" in bitrates[j]) {
-                                        var description = "";
-                                        if (bitrates[j].isDefault)
-                                            description += "default:";
-                                        if (bitrates[j].sd)
-                                            description += "sd:";
-                                        if (bitrates[j].hd)
-                                            description += "hd:";
-                                        if (bitrates[j].bitrate)
-                                            description += bitrates[j].bitrate;
+                        try {
+                            els[0] = document.getElementById(arguments[0]);
+                        } catch(e) {
+                        }
 
-                                        i2d_show_url("flowplayer", bitrates[j].url, description);
-                                    }
-                                }
+                        try {
+                            if (!els[0])
+                                els = document.querySelectorAll(arguments[0]);
+                        } catch(e) {
+                            return;
+                        }
+
+                        for (var i = 0; i < els.length; i++) {
+                            if (typeof els[i] !== "object" || !("getAttribute" in els[i]))
+                                continue;
+
+                            var href = els[i].getAttribute("href");
+                            if (href) {
+                                i2d_show_url("flowplayer", href, "href");
                             }
                         }
                     }
+                }).apply(this, arguments);
+
+                function check_sources(x, label, baseurl) {
+                    if (typeof x === "string") {
+                        if (baseurl)
+                            x = baseurl + "/" + x;
+
+                        if (!x.match(/\.xml$/))
+                            i2d_show_url("flowplayer", x, label);
+
+                        return;
+                    }
+
+                    if (x instanceof Array) {
+                        for (var i = 0; i < x.length; i++) {
+                            check_sources(x[i], label, baseurl);
+                        }
+                        return;
+                    }
+
+                    if (typeof x !== "object")
+                        return;
+
+                    label = "";
+
+                    if ("title" in x)
+                        label += "[" + x.title + "]";
+
+                    if ("clip" in x) {
+                        if ("baseUrl" in x.clip)
+                            baseurl = x.clip.baseUrl;
+
+                        check_sources(x.clip, label, baseurl);
+                    }
+
+                    if ("playlist" in x) {
+                        check_sources(x.playlist, label, baseurl);
+                    }
+
+                    if ("url" in x) {
+                        check_sources(x.url, label, baseurl);
+                    }
+
+                    if ("bitrates" in x) {
+                        for (var j = 0; j < x.bitrates.length; j++) {
+                            if ("url" in x.bitrates[j]) {
+                                var description = "";
+                                if (x.bitrates[j].isDefault)
+                                    description += "default:";
+                                if (x.bitrates[j].sd)
+                                    description += "sd:";
+                                if (x.bitrates[j].hd)
+                                    description += "hd:";
+                                if (x.bitrates[j].bitrate)
+                                    description += x.bitrates[j].bitrate;
+
+                                i2d_show_url("flowplayer", x.bitrates[j].url, description);
+                            }
+                        }
+                    }
+                }
+
+                if (arguments.length >= 3 && typeof arguments[2] === "object") {
+                    check_sources(arguments[2]);
+                } else if (arguments.length >= 3 && typeof arguments[2] === "string") {
+                    i2d_show_url("flowplayer", arguments[2]);
                 }
 
                 var result = oldvariable.apply(this, arguments);
@@ -298,8 +358,8 @@
 
                 var old_fplayer_addclip = result.addClip;
                 result.addClip = function() {
-                    if (arguments.length > 0 && typeof arguments[0] === "object" && "url" in arguments[0])
-                      i2d_show_url("flowplayer", arguments[0].url);
+                    if (arguments.length > 0)
+                        check_sources(arguments[0]);
 
                     return old_fplayer_addclip.apply(this, arguments);
                 };
