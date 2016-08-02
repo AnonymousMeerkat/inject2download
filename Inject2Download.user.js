@@ -235,19 +235,23 @@
         if ("flowplayer" in unsafeWindow && !unsafeWindow.flowplayer.INJECTED) {
             inject("flowplayer", function() {
                 var obj_baseurl = null;
+                var els = [];
 
                 function get_url(x) {
+                    x = decodeURIComponent(x);
+
                     if (obj_baseurl) {
-                        if (x.match(/^[a-z]*:\/\//))
+                        if (x.match(/^[a-z]*:\/\//)) {
                             return x;
-                        else
+                        } else {
                             return obj_baseurl + "/" + x;
+                        }
                     } else {
                         return x;
                     }
                 };
 
-                function check_sources(x, label) {
+                function check_sources(x, els, label) {
                     if (typeof x === "string") {
                         if (!x.match(/\.xml$/))
                             i2d_show_url("flowplayer", get_url(x), label);
@@ -257,7 +261,7 @@
 
                     if (x instanceof Array) {
                         for (var i = 0; i < x.length; i++) {
-                            check_sources(x[i], label);
+                            check_sources(x[i], els, label);
                         }
                         return;
                     }
@@ -279,15 +283,15 @@
                             }
                         }
 
-                        check_sources(x.clip, label);
+                        check_sources(x.clip, els, label);
                     }
 
                     if ("playlist" in x) {
-                        check_sources(x.playlist, label);
+                        check_sources(x.playlist, els, label);
                     }
 
                     if ("url" in x) {
-                        check_sources(x.url, label);
+                        check_sources(x.url, els, label);
                     }
 
                     if ("bitrates" in x) {
@@ -310,7 +314,7 @@
                 }
 
                 if (arguments.length >= 1) {
-                    var els = [null];
+                    els = [null];
 
                     if (typeof arguments[0] === "string") {
                         try {
@@ -330,18 +334,21 @@
                 }
 
                 for (var i = 0; i < els.length; i++) {
+                    if (!els[i] || !(els[i] instanceof HTMLElement))
+                        continue;
+
                     if ("i2d_baseurl" in els[i])
                         obj_baseurl = els[i].i2d_baseurl;
                 }
 
                 if (arguments.length >= 3 && typeof arguments[2] === "object") {
-                    check_sources(arguments[2]);
+                    check_sources(arguments[2], els);
                 } else if (arguments.length >= 3 && typeof arguments[2] === "string") {
                     i2d_show_url("flowplayer", get_url(arguments[2]));
                 }
 
                 for (var i = 0; i < els.length; i++) {
-                    if (typeof els[i] !== "object" || !("getAttribute" in els[i]))
+                    if (!els[i] || !(els[i] instanceof HTMLElement))
                         continue;
 
                     var href = els[i].getAttribute("href");
@@ -355,21 +362,25 @@
                 if (!result)
                     return result;
 
-                var old_fplayer_addclip = result.addClip;
-                result.addClip = function() {
-                    if (arguments.length > 0)
-                        check_sources(arguments[0]);
+                if ("addClip" in result) {
+                    var old_fplayer_addclip = result.addClip;
+                    result.addClip = function() {
+                        if (arguments.length > 0)
+                            check_sources(arguments[0], els);
 
-                    return old_fplayer_addclip.apply(this, arguments);
-                };
+                        return old_fplayer_addclip.apply(this, arguments);
+                    };
+                }
 
-                var old_fplayer_setplaylist = result.setPlaylist;
-                result.setPlaylist = function() {
-                    if (arguments.length > 0)
-                        check_sources(arguments[0]);
+                if ("setPlaylist" in result) {
+                    var old_fplayer_setplaylist = result.setPlaylist;
+                    result.setPlaylist = function() {
+                        if (arguments.length > 0)
+                            check_sources(arguments[0], els);
 
-                    return old_fplayer_setplaylist.apply(this, arguments);
-                };
+                        return old_fplayer_setplaylist.apply(this, arguments);
+                    };
+                }
 
                 return result;
             });
