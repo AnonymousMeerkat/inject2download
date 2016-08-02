@@ -296,12 +296,20 @@
                         check_sources(x.clip, els, label);
                     }
 
+                    if ("sources" in x) {
+                        check_sources(x.sources, els, label);
+                    }
+
                     if ("playlist" in x) {
                         check_sources(x.playlist, els, label);
                     }
 
                     if ("url" in x) {
                         check_sources(x.url, els, label);
+                    }
+
+                    if ("src" in x) {
+                        check_sources(x.src, els. label);
                     }
 
                     if ("bitrates" in x) {
@@ -355,6 +363,10 @@
                     check_sources(arguments[2], els);
                 } else if (arguments.length >= 3 && typeof arguments[2] === "string") {
                     i2d_show_url("flowplayer", get_url(arguments[2]));
+                } else if (arguments.length === 2 && typeof arguments[1] === "object") {
+                    check_sources(arguments[1], els);
+                } else if (arguments.length === 2 && typeof arguments[1] === "string") {
+                    i2d_show_url("flowplayer", get_url(arguments[1]));
                 }
 
                 for (var i = 0; i < els.length; i++) {
@@ -369,7 +381,7 @@
 
                 var result = oldvariable.apply(this, arguments);
 
-                if (!result)
+                if (!result || typeof result !== "object")
                     return result;
 
                 if ("addClip" in result) {
@@ -393,8 +405,7 @@
                 }
 
                 return result;
-            });
-            inject("$f", function() {return flowplayer.apply(this, arguments)});
+            }, ["$f"]);
         }
 
         if ("videojs" in unsafeWindow && !unsafeWindow.videojs.INJECTED) {
