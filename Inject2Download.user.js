@@ -294,8 +294,13 @@
                         label += "[" + x.title + "]";
 
                     if ("clip" in x) {
-                        if ("baseUrl" in x.clip)
+                        if ("baseUrl" in x.clip) {
                             obj_baseurl = x.clip.baseUrl;
+
+                            for (var i = 0; i < els.length; i++) {
+                                els[i].i2d_baseurl = obj_baseurl;
+                            }
+                        }
 
                         check_sources(x.clip, label);
                     }
@@ -327,16 +332,10 @@
                     }
                 }
 
-                if (arguments.length >= 3 && typeof arguments[2] === "object") {
-                    check_sources(arguments[2]);
-                } else if (arguments.length >= 3 && typeof arguments[2] === "string") {
-                    i2d_show_url("flowplayer", get_url(arguments[2]));
-                }
+                if (arguments.length >= 1) {
+                    var els = [null];
 
-                (function() {
-                    if (arguments.length >= 1) {
-                        var els = [null];
-
+                    if (typeof arguments[0] === "string") {
                         try {
                             els[0] = document.getElementById(arguments[0]);
                         } catch(e) {
@@ -346,20 +345,33 @@
                             if (!els[0])
                                 els = document.querySelectorAll(arguments[0]);
                         } catch(e) {
-                            return;
+                            els = [];
                         }
-
-                        for (var i = 0; i < els.length; i++) {
-                            if (typeof els[i] !== "object" || !("getAttribute" in els[i]))
-                                continue;
-
-                            var href = els[i].getAttribute("href");
-                            if (href) {
-                                i2d_show_url("flowplayer", get_url(href), "href");
-                            }
-                        }
+                    } else if (arguments[0] instanceof HTMLElement) {
+                        els = [arguments[0]];
                     }
-                }).apply(this, arguments);
+                }
+
+                for (var i = 0; i < els.length; i++) {
+                    if ("i2d_baseurl" in els[i])
+                        obj_baseurl = els[i].i2d_baseurl;
+                }
+
+                if (arguments.length >= 3 && typeof arguments[2] === "object") {
+                    check_sources(arguments[2]);
+                } else if (arguments.length >= 3 && typeof arguments[2] === "string") {
+                    i2d_show_url("flowplayer", get_url(arguments[2]));
+                }
+
+                for (var i = 0; i < els.length; i++) {
+                    if (typeof els[i] !== "object" || !("getAttribute" in els[i]))
+                        continue;
+
+                    var href = els[i].getAttribute("href");
+                    if (href) {
+                        i2d_show_url("flowplayer", get_url(href), "href");
+                    }
+                }
 
                 var result = oldvariable.apply(this, arguments);
 
@@ -372,6 +384,14 @@
                         check_sources(arguments[0]);
 
                     return old_fplayer_addclip.apply(this, arguments);
+                };
+
+                var old_fplayer_setplaylist = result.setPlaylist;
+                result.setPlaylist = function() {
+                    if (arguments.length > 0)
+                        check_sources(arguments[0]);
+
+                    return old_fplayer_setplaylist.apply(this, arguments);
                 };
 
                 return result;
