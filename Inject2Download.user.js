@@ -182,57 +182,66 @@
             inject("jwplayer", function() {
                 var result = oldvariable.apply(this, arguments);
 
+                var check_sources = function(x) {
+                    if (typeof x === "object") {
+                        var label = "";
+
+                        if ("title" in x)
+                            label += "[" + x.title + "]";
+
+                        if ("label" in x)
+                            label += "[" + x.label + "]";
+
+                        if ("streamer" in x) {
+                            i2d_show_url("jwplayer", x.streamer, "[stream]" + label);
+                        }
+
+                        if ("file" in x) {
+                            i2d_show_url("jwplayer", x.file, label);
+                        }
+
+                        if ("sources" in x) {
+                            for (var i = 0; i < x.sources.length; i++) {
+                                check_sources(x.sources[i]);
+                            }
+                        }
+
+                        if ("playlist" in x && x.playlist instanceof Array) {
+                            for (var i = 0; i < x.playlist.length; i++) {
+                                check_sources(x.playlist[i]);
+                            }
+                        }
+                    } else if (typeof x === "string") {
+                        i2d_show_url("jwplayer", x);
+                    }
+                };
+
                 var old_jwplayer_setup = result.setup;
                 result.setup = function() {
                     if (typeof arguments[0] === "object") {
                         var x = arguments[0];
-                        if ("file" in x) {
-                            i2d_show_url("jwplayer", x.file);
-                        }
-                        if ("streamer" in x) {
-                            i2d_show_url("jwplayer", x.streamer, "stream");
-                        }
+
                         if ("modes" in x) {
                             for (var i = 0; i < x.modes.length; i++) {
                                 // TODO: support more?
                                 if ("type" in x.modes[i] && x.modes[i].type === "html5") {
                                     if ("config" in x.modes[i] && "file" in x.modes[i].config) {
-                                        i2d_show_url("jwplayer", x.modes[i].config.file);
+                                        check_sources(x.modes[i].config);
                                     }
                                 }
-                            }
-                        }
-
-                        var check_sources = function(x) {
-                            if ("sources" in x) {
-                                if (x.sources instanceof Array) {
-                                    for (var i = 0; i < x.sources.length; i++) {
-                                        if (!("file" in x.sources[i]))
-                                            continue;
-
-                                        if ("label" in x.sources[i])
-                                            i2d_show_url("jwplayer", x.sources[i].file, x.sources[i].label);
-                                        else
-                                            i2d_show_url("jwplayer", x.sources[i].file);
-                                    }
-                                } else {
-                                    if ("file" in x.sources)
-                                        i2d_show_url("jwplayer", x.sources.file);
-                                }
-                            } else if ("file" in x) {
-                                i2d_show_url("jwplayer", x.file);
                             }
                         }
 
                         check_sources(x);
-                        if ("playlist" in x && x.playlist instanceof Array) {
-                            for (var i = 0; i < x.playlist.length; i++) {
-                               check_sources(x.playlist[i]);
-                            }
-                        }
                     }
 
                     return old_jwplayer_setup.apply(this, arguments);
+                };
+
+                var old_jwplayer_load = result.load;
+                result.load = function() {
+                    check_sources(arguments[0]);
+                    return old_jwplayer_load.apply(this, arguments);
                 };
 
                 return result;
