@@ -116,44 +116,14 @@
                    "}");
     }
 
-    function inject_jquery_base() {
-        console.log("[i2d] injecting jquery base function");
-        add_script("window.i2d_jquery_plugins = {};");
-        inject("jQuery", function() {
-            var result = oldvariable.apply(this, arguments);
-
-            var keys = Object.keys(i2d_jquery_plugins);
-            for (var i = 0; i < keys.length; i++) {
-                if (!(keys[i] in result))
-                    continue;
-
-                (function() {
-                    var ourkey = keys[i];
-
-                    var old_plugin = result[ourkey];
-                    var old_plugin_keys = Object.keys(old_plugin);
-
-                    result[ourkey] = function() {
-                        return window.i2d_jquery_plugins[ourkey].call(this, old_plugin, arguments);
-                    };
-
-                    for (var x = 0; x < old_plugin_keys.length; x++) {
-                        result[keys[i]][old_plugin_keys[x]] = old_plugin[old_plugin_keys[x]];
-                    }
-                })();
-            }
-
-            return result;
-        }, ["$"]);
-    }
-
     function inject_jquery_plugin(name, value) {
-        console.log("[i2d] injecting jquery plugin " + name);
+        if (!("jQuery" in unsafeWindow) ||
+            !("fn" in unsafeWindow.jQuery) ||
+            !(name in unsafeWindow.jQuery.fn) ||
+            unsafeWindow.jQuery.fn[name].INJECTED)
+            return;
 
-        add_script(i2d_show_url.toString() +
-                   "if (!(" + JSON.stringify(name) + " in i2d_jquery_plugins)) {\n" +
-                   "i2d_jquery_plugins[" + JSON.stringify(name) + "] = " + value.toString() + ";\n" +
-                   "}");
+        inject("jQuery.fn." + name, value);
     }
 
 
@@ -510,34 +480,28 @@
         }
 
         if ("jQuery" in unsafeWindow) {
-            if (!unsafeWindow.jQuery.INJECTED) {
-                inject_jquery_base();
-            }
+            inject_jquery_plugin("jPlayer", function() {
+                if (arguments.length > 0 && arguments[0] === "setMedia") {
+                    if (arguments.length > 1) {
+                        if (typeof arguments[1] === "object") {
+                            for (var i in arguments[1]) {
+                                if (i === "title" ||
+                                    i === "duration" ||
+                                    i === "track" /* for now */ ||
+                                    i === "artist" ||
+                                    i === "free")
+                                    continue;
 
-            if (unsafeWindow.jQuery.fn.jPlayer && !("jPlayer" in unsafeWindow.i2d_jquery_plugins)) {
-                inject_jquery_plugin("jPlayer", function(orig, args) {
-                    if (args.length > 0 && args[0] === "setMedia") {
-                        if (args.length > 1) {
-                            if (typeof args[1] === "object") {
-                                for (var i in args[1]) {
-                                    if (i === "title" ||
-                                        i === "duration" ||
-                                        i === "track" /* for now */ ||
-                                        i === "artist" ||
-                                        i === "free")
-                                        continue;
-
-                                    i2d_show_url("jPlayer", args[1][i], i);
-                                }
-                            } else if (typeof args[1] === "string") {
-                                i2d_show_url("jPlayer", args[1]);
+                                i2d_show_url("jPlayer", arguments[1][i], i);
                             }
+                        } else if (typeof arguments[1] === "string") {
+                            i2d_show_url("jPlayer", arguments[1]);
                         }
                     }
+                }
 
-                    return orig.apply(this, args);
-                })
-            }
+                return oldvariable.apply(this, arguments);
+            });
         }
     }
 
