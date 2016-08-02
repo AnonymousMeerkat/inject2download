@@ -26,6 +26,9 @@
         if (typeof url !== "string" || url.replace("\s", "").length === 0)
             return;
 
+        if (url.match(/^mediasource:/))
+            return;
+
         url = get_absolute_url(url);
 
         if (!("i2d_url_list" in window))
