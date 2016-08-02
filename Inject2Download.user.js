@@ -157,7 +157,7 @@
 
                 var check_sources = function(x) {
                     if (typeof x === "object") {
-                        if ("length" in x) {
+                        if (x instanceof Array) {
                             for (var i = 0; i < x.length; i++) {
                                 check_sources(x[i]);
                             }
@@ -181,15 +181,11 @@
                         }
 
                         if ("sources" in x) {
-                            for (var i = 0; i < x.sources.length; i++) {
-                                check_sources(x.sources[i]);
-                            }
+                            check_sources(x.sources);
                         }
 
-                        if ("playlist" in x && x.playlist instanceof Array) {
-                            for (var i = 0; i < x.playlist.length; i++) {
-                                check_sources(x.playlist[i]);
-                            }
+                        if ("playlist" in x) {
+                            check_sources(x.playlist);
                         }
                     } else if (typeof x === "string") {
                         i2d_show_url("jwplayer", x);
