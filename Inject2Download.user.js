@@ -404,8 +404,33 @@
                     };
                 }
 
+                if ("load" in result) {
+                    var old_fplayer_load = result.load;
+                    result.load = function() {
+                        if (arguments.length > 0)
+                            check_sources(arguments[0], els);
+
+                        return old_fplayer_load.apply(this, arguments);
+                    }
+                }
+
+                /*if ("on" in result) {
+                    result.on("load", function(e, api, video) {
+                        console.log(e);
+                        check_sources(video || api.video, els);
+                    });
+                }*/
+
                 return result;
             }, ["$f"]);
+
+            add_script(get_script_str(function() {
+                flowplayer(function(api, root) {
+                    api.on("load", function(e, api, video) {
+                        flowplayer().load(video || api.video);
+                    });
+                });
+            }));
         }
 
         if ("videojs" in unsafeWindow && !unsafeWindow.videojs.INJECTED) {
