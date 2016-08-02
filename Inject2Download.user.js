@@ -196,33 +196,37 @@
                     }
                 };
 
-                var old_jwplayer_setup = result.setup;
-                result.setup = function() {
-                    if (typeof arguments[0] === "object") {
-                        var x = arguments[0];
+                if ("setup" in result) {
+                    var old_jwplayer_setup = result.setup;
+                    result.setup = function() {
+                        if (typeof arguments[0] === "object") {
+                            var x = arguments[0];
 
-                        if ("modes" in x) {
-                            for (var i = 0; i < x.modes.length; i++) {
-                                // TODO: support more?
-                                if ("type" in x.modes[i] && x.modes[i].type === "html5") {
-                                    if ("config" in x.modes[i] && "file" in x.modes[i].config) {
-                                        check_sources(x.modes[i].config);
+                            if ("modes" in x) {
+                                for (var i = 0; i < x.modes.length; i++) {
+                                    // TODO: support more?
+                                    if ("type" in x.modes[i] && x.modes[i].type === "html5") {
+                                        if ("config" in x.modes[i] && "file" in x.modes[i].config) {
+                                            check_sources(x.modes[i].config);
+                                        }
                                     }
                                 }
                             }
+
+                            check_sources(x);
                         }
 
-                        check_sources(x);
-                    }
+                        return old_jwplayer_setup.apply(this, arguments);
+                    };
+                }
 
-                    return old_jwplayer_setup.apply(this, arguments);
-                };
-
-                var old_jwplayer_load = result.load;
-                result.load = function() {
-                    check_sources(arguments[0]);
-                    return old_jwplayer_load.apply(this, arguments);
-                };
+                if ("load" in result) {
+                    var old_jwplayer_load = result.load;
+                    result.load = function() {
+                        check_sources(arguments[0]);
+                        return old_jwplayer_load.apply(this, arguments);
+                    };
+                }
 
                 return result;
             });
