@@ -60,7 +60,7 @@
             el.id = "i2d-popup";
             document.body.appendChild(el);
         }
-        el.innerHTML += text + "<a href='" + newurl + "'>" + newurl + "</a><br />";
+        el.innerHTML += text + "<a href='" + newurl + "' style='color:blue'>" + newurl + "</a><br />";
 
         // XXX: why is this needed? test: http://playbb.me/embed.php?w=718&h=438&vid=at/nw/flying_witch_-_01.mp4, animeplus.tv
         document.body.removeChild(el);
