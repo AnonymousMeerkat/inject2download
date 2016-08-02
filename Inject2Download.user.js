@@ -224,6 +224,16 @@
                     };
                 }
 
+                if ("on" in result) {
+                    var old_jwplayer_on = result.on;
+                    result.on = function() {
+                        if (arguments[0] === "adBlock")
+                            return;
+
+                        return old_jwplayer_on.apply(this, arguments);
+                    }
+                }
+
                 return result;
             });
         }
