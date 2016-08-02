@@ -184,6 +184,13 @@
 
                 var check_sources = function(x) {
                     if (typeof x === "object") {
+                        if ("length" in x) {
+                            for (var i = 0; i < x.length; i++) {
+                                check_sources(x[i]);
+                            }
+                            return;
+                        }
+
                         var label = "";
 
                         if ("title" in x)
