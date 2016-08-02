@@ -211,6 +211,8 @@
                                     if ("file" in x.sources)
                                         i2d_show_url("jwplayer", x.sources.file);
                                 }
+                            } else if ("file" in x) {
+                                i2d_show_url("jwplayer", x.file);
                             }
                         }
 
