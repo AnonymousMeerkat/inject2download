@@ -225,6 +225,10 @@
                 }
 
                 if ("on" in result) {
+                    result.on('playlistItem', function(item) {
+                        check_sources(item.item);
+                    });
+
                     var old_jwplayer_on = result.on;
                     result.on = function() {
                         if (arguments[0] === "adBlock")
