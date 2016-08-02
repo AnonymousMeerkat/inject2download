@@ -14,11 +14,19 @@
 
     // Helper functions
     function i2d_show_url(namespace, url, description) {
+        function get_absolute_url(url) {
+            var a = document.createElement('a');
+            a.href = url;
+            return a.href;
+        }
+
         if (!description)
             description = "";
 
         if (typeof url !== "string" || url.replace("\s", "").length === 0)
             return;
+
+        url = get_absolute_url(url);
 
         if (!("i2d_url_list" in window))
             window.i2d_url_list = [];
