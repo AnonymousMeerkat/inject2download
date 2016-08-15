@@ -620,5 +620,7 @@
         };
         add_script(i2d_show_url.toString() + "\n" +
                   "(" + get_raws.toString() + ")();");
+
+        i2d_main();
     });
 })();
