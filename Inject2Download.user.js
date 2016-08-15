@@ -120,10 +120,10 @@
     }
 
     function inject_jquery_plugin(name, value) {
-        if (!("jQuery" in unsafeWindow) ||
-            !("fn" in unsafeWindow.jQuery) ||
-            !(name in unsafeWindow.jQuery.fn) ||
-            unsafeWindow.jQuery.fn[name].INJECTED)
+        if (!("jQuery" in window) ||
+            !("fn" in window.jQuery) ||
+            !(name in window.jQuery.fn) ||
+            window.jQuery.fn[name].INJECTED)
             return;
 
         inject("jQuery.fn." + name, value);
@@ -140,7 +140,7 @@
             }
         }
 
-        if ("soundManager" in unsafeWindow && !unsafeWindow.soundManager.INJECTED) {
+        if ("soundManager" in window && !window.soundManager.INJECTED) {
             inject("soundManager.createSound", function(arg1, arg2) {
                 if (typeof arg1 === "string")
                     i2d_show_url("soundManager", arg2);
@@ -151,7 +151,7 @@
             });
         }
 
-        if ("jwplayer" in unsafeWindow && !unsafeWindow.jwplayer.INJECTED) {
+        if ("jwplayer" in window && !window.jwplayer.INJECTED) {
             inject("jwplayer", function() {
                 var result = oldvariable.apply(this, arguments);
 
@@ -242,7 +242,7 @@
             });
         }
 
-        if ("flowplayer" in unsafeWindow && !unsafeWindow.flowplayer.INJECTED) {
+        if ("flowplayer" in window && !window.flowplayer.INJECTED) {
             inject("flowplayer", function() {
                 var obj_baseurl = null;
                 var els = [];
@@ -433,7 +433,7 @@
             }));
         }
 
-        if ("videojs" in unsafeWindow && !unsafeWindow.videojs.INJECTED) {
+        if ("videojs" in window && !window.videojs.INJECTED) {
             inject("videojs", function() {
                 if (arguments.length > 0 && typeof arguments[0] === "string") {
                     var my_el = document.getElementById(arguments[0]);
@@ -498,7 +498,7 @@
                        }));
         }
 
-        if ("amp" in unsafeWindow && !unsafeWindow.amp.INJECTED) {
+        if ("amp" in window && !window.amp.INJECTED) {
             inject("amp", function() {
                 function show_amp_source(sourceobj) {
                     if ("protectionInfo" in sourceobj) {
@@ -534,7 +534,7 @@
             });
         }
 
-        if (window.location.host.search("forvo") >= 0 && "createAudioObject" in unsafeWindow && !unsafeWindow.createAudioObject.INJECTED) {
+        if (window.location.host.search("forvo") >= 0 && "createAudioObject" in window && !window.createAudioObject.INJECTED) {
             inject("createAudioObject", function(id, mp3, ogg) {
                 i2d_show_url("forvo", mp3, "mp3");
                 i2d_show_url("forvo", ogg, "ogg");
@@ -543,7 +543,7 @@
             });
         }
 
-        if ("jQuery" in unsafeWindow) {
+        if ("jQuery" in window) {
             inject_jquery_plugin("jPlayer", function() {
                 if (arguments.length > 0 && arguments[0] === "setMedia") {
                     if (arguments.length > 1) {
