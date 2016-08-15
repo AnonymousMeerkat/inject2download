@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Inject2Download
 // @namespace    http://lkubuntu.wordpress.com/
-// @version      0.2.2
+// @version      0.2.3
 // @description  Simple media download script
 // @author       Anonymous Meerkat
 // @include      *
