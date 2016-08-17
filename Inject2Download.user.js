@@ -119,10 +119,17 @@
                    "}");
     }
 
-    function inject_jquery_plugin(name, value) {
+    function jquery_plugin_exists(name) {
         if (!("jQuery" in window) ||
             !("fn" in window.jQuery) ||
-            !(name in window.jQuery.fn) ||
+            !(name in window.jQuery.fn))
+            return false;
+
+        return true;
+    }
+
+    function inject_jquery_plugin(name, value) {
+        if (!jquery_plugin_exists(name) ||
             window.jQuery.fn[name].INJECTED)
             return;
 
@@ -605,6 +612,38 @@
 
                 return result;
             });
+
+            if (jquery_plugin_exists("jPlayerAudio") && !window.jQuery.fn.jPlayerAudio.INJECTED) {
+                inject_jquery_plugin("jPlayerAudio", function() {
+                    return oldvariable.apply(this, arguments);
+                });
+
+                add_script(i2d_show_url.toString() + "\n" +
+                           "var oldmedia=jQuery.jPlayerAudio.prototype.setMedia;\n" +
+                           "jQuery.jPlayerAudio.prototype.setMedia = function(e) {\n" +
+                           "  var absolute = this._absoluteMediaUrls(e);\n" +
+                           "  jQuery.each(this.formats, function(a, o) {\n" +
+                           "    i2d_show_url('cleanaudioplayer', absolute[o]);\n" +
+                           "  });\n" +
+                           "  return oldmedia.apply(this, arguments);\n" +
+                           "}");
+            }
+
+            if (jquery_plugin_exists("jPlayerVideo") && !window.jQuery.fn.jPlayerVideo.INJECTED) {
+                inject_jquery_plugin("jPlayerVideo", function() {
+                    return oldvariable.apply(this, arguments);
+                });
+
+                add_script(i2d_show_url.toString() + "\n" +
+                           "var oldmedia=jQuery.jPlayerVideo.prototype.setMedia;\n" +
+                           "jQuery.jPlayerVideo.prototype.setMedia = function(e) {\n" +
+                           "  var absolute = this._absoluteMediaUrls(e);\n" +
+                           "  jQuery.each(this.formats, function(a, o) {\n" +
+                           "    i2d_show_url('cleanvideoplayer', absolute[o]);\n" +
+                           "  });\n" +
+                           "  return oldmedia.apply(this, arguments);\n" +
+                           "}");
+            }
         }
     }
 
