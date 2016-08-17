@@ -566,6 +566,45 @@
 
                 return oldvariable.apply(this, arguments);
             });
+
+            inject_jquery_plugin("amazingaudioplayer", function() {
+                var result = oldvariable.apply(this, arguments);
+
+                function add_source_obj(x) {
+                    type = "";
+                    if ("type" in x) {
+                        type = x.type;
+                    }
+
+                    i2d_show_url("amazingaudioplayer", x.src, type);
+                }
+
+                function add_source(x) {
+                    if (x instanceof Array) {
+                        for (var i = 0; i < x.length; i++) {
+                            add_source_obj(x[i]);
+                        }
+                    } else {
+                        add_source_obj(x);
+                    }
+                }
+
+                var audioplayer = jQuery(this).data("object").audioPlayer;
+                if (audioplayer.audioItem) {
+                    add_source(audioplayer.audioItem.source);
+                }
+
+                var oldload = audioplayer.load;
+                audioplayer.load = function(item) {
+                    if ("source" in item) {
+                        add_source(item.source);
+                    }
+
+                    return oldload.apply(this, arguments);
+                };
+
+                return result;
+            });
         }
     }
 
