@@ -121,6 +121,7 @@
 
     function jquery_plugin_exists(name) {
         if (!("jQuery" in window) ||
+            !(typeof window.jQuery === "object") ||
             !("fn" in window.jQuery) ||
             !(name in window.jQuery.fn))
             return false;
@@ -541,7 +542,18 @@
             });
         }
 
-        if (window.location.host.search("forvo") >= 0 && "createAudioObject" in window && !window.createAudioObject.INJECTED) {
+        if ("DJPlayer" in window && !window.DJPlayer.INJECTED) {
+            add_script(i2d_show_url.toString() + "\n" +
+                       "var oldsetmedia = window.DJPlayer.prototype.setMedia;\n" +
+                       "window.DJPlayer.prototype.setMedia = function() {\n" +
+                       "  if (arguments.length > 0 && typeof arguments[0] === 'string') {\n" +
+                       "    i2d_show_url('DJPlayer', arguments[0]);\n" +
+                       "  }\n" +
+                       "  return oldsetmedia.apply(this, arguments);\n" +
+                       "}");
+        }
+
+        if (("location" in window) && window.location && window.location.host.search("forvo") >= 0 && "createAudioObject" in window && !window.createAudioObject.INJECTED) {
             inject("createAudioObject", function(id, mp3, ogg) {
                 i2d_show_url("forvo", mp3, "mp3");
                 i2d_show_url("forvo", ogg, "ogg");
