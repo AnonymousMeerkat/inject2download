@@ -12,6 +12,8 @@
 (function() {
     "use strict";
 
+    var twitter_injected = false;
+
     // Helper functions
     function i2d_show_url(namespace, url, description) {
         function get_absolute_url(url) {
@@ -562,6 +564,28 @@
             });
         }
 
+        if (("location" in window) && window.location && window.location.href.search("twitter.com/i/videos") >= 0 && !twitter_injected) {
+            twitter_injected = true;
+
+            document.addEventListener("DOMContentLoaded", function() {
+                var pc = document.getElementById('playerContainer');
+                if (!pc) {
+                    return;
+                }
+
+                var config = pc.getAttribute('data-config');
+                if (!config) {
+                    return;
+                }
+
+                var config_parsed = JSON.parse(config);
+
+                if ("video_url" in config_parsed) {
+                    i2d_show_url('twitter', config_parsed.video_url);
+                }
+            });
+        }
+
         if ("jQuery" in window) {
             inject_jquery_plugin("jPlayer", function() {
                 if (arguments.length > 0 && arguments[0] === "setMedia") {
@@ -662,7 +686,7 @@
     i2d_main();
 
     window.addEventListener("afterscriptexecute", function(e) {
-      i2d_main(e.target);
+        i2d_main(e.target);
     });
 
     document.addEventListener("DOMContentLoaded", function() {
