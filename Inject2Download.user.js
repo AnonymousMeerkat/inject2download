@@ -123,7 +123,6 @@
 
     function jquery_plugin_exists(name) {
         if (!("jQuery" in window) ||
-            !(typeof window.jQuery === "object") ||
             !("fn" in window.jQuery) ||
             !(name in window.jQuery.fn))
             return false;
