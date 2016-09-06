@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Inject2Download
 // @namespace    http://lkubuntu.wordpress.com/
-// @version      0.2.5.1
+// @version      0.2.5.2
 // @description  Simple media download script
 // @author       Anonymous Meerkat
 // @include      *
@@ -728,7 +728,7 @@
         var get_raws = function() {
             var audios = [].slice.call(document.getElementsByTagName("audio"));
             var videos = [].slice.call(document.getElementsByTagName("video"));
-            var els = Array.concat(audios, videos);
+            var els = Array.prototype.concat(audios, videos);
 
             for (var i = 0; i < els.length; i++) {
                 var basename = "raw ";
