@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Inject2Download
 // @namespace    http://lkubuntu.wordpress.com/
-// @version      0.2.5.2
+// @version      0.2.5.3
 // @description  Simple media download script
 // @author       Anonymous Meerkat
 // @include      *
@@ -245,7 +245,7 @@
                             return;
 
                         return old_jwplayer_on.apply(this, arguments);
-                    }
+                    };
                 }
 
                 return result;
@@ -269,7 +269,7 @@
                     } else {
                         return x;
                     }
-                };
+                }
 
                 function check_sources(x, els, label) {
                     if (typeof x === "string") {
@@ -421,7 +421,7 @@
                             check_sources(arguments[0], els);
 
                         return old_fplayer_load.apply(this, arguments);
-                    }
+                    };
                 }
 
                 /*if ("on" in result) {
@@ -495,10 +495,10 @@
                                            i2d_show_url("videojs", my_el.src);
                                         }
 
-                                        for (var i = 0; i < my_el.children.length; i++) {
-                                            if (my_el.children[i].tagName.toLowerCase() === "source") {
-                                                if (my_el.children[i].src) {
-                                                    i2d_show_url("videojs", my_el.children[i].src, my_el.children[i].getAttribute("label"));
+                                        for (var j = 0; j < my_el.children.length; j++) {
+                                            if (my_el.children[j].tagName.toLowerCase() === "source") {
+                                                if (my_el.children[j].src) {
+                                                    i2d_show_url("videojs", my_el.children[j].src, my_el.children[j].getAttribute("label"));
                                                 }
                                             }
                                         }
