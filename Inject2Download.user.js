@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Inject2Download
 // @namespace    http://lkubuntu.wordpress.com/
-// @version      0.2.4
+// @version      0.2.5
 // @description  Simple media download script
 // @author       Anonymous Meerkat
 // @include      *
@@ -13,6 +13,7 @@
     "use strict";
 
     var twitter_injected = false;
+    var vine_injected = false;
 
     // Helper functions
     function i2d_show_url(namespace, url, description) {
@@ -581,6 +582,41 @@
 
                 if ("video_url" in config_parsed) {
                     i2d_show_url('twitter', config_parsed.video_url);
+                }
+            });
+        }
+
+        if (("location" in window) && window.location && window.location.href.search("vine.co/v/") >= 0 && !vine_injected) {
+            vine_injected = true;
+
+            document.addEventListener("DOMContentLoaded", function() {
+                var config_el = document.getElementById("configuration");
+                if (!config_el) {
+                    return;
+                }
+
+                var config = JSON.parse(config_el.innerHTML);
+                if (!config || typeof config !== "object") {
+                    return;
+                }
+
+                if (!("post" in config) || !("videoUrls" in config.post)) {
+                    return;
+                }
+
+                for (var i = 0; i < config.post.videoUrls.length; i++) {
+                    var videourl = config.post.videoUrls[i];
+
+                    var formatstr = "[";
+                    formatstr += videourl.format + ":";
+                    formatstr += videourl.idStr;
+
+                    if (videourl.rate > 0)
+                        formatstr += ", " + videourl.rate;
+
+                    formatstr += "]";
+
+                    i2d_show_url('vine', videourl.videoUrl, formatstr);
                 }
             });
         }
