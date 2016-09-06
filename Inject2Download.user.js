@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Inject2Download
 // @namespace    http://lkubuntu.wordpress.com/
-// @version      0.2.5.6
+// @version      0.2.5.7
 // @description  Simple media download script
 // @author       Anonymous Meerkat
 // @include      *
@@ -12,8 +12,7 @@
 (function() {
     "use strict";
 
-    var twitter_injected = false;
-    var vine_injected = false;
+    var injected_set = {};
 
     // Helper functions
     function i2d_show_url(namespace, url, description) {
@@ -573,8 +572,8 @@
             });
         }
 
-        if (("location" in window) && window.location && window.location.href.search("twitter.com/i/videos") >= 0 && !twitter_injected) {
-            twitter_injected = true;
+        if (("location" in window) && window.location && window.location.href.search("twitter.com/i/videos") >= 0 && !("twitter" in injected_set)) {
+            injected_set["twitter"] = true;
 
             i2d_onload(function() {
                 var pc = document.getElementById('playerContainer');
@@ -595,26 +594,10 @@
             });
         }
 
-        if (("location" in window) && window.location && window.location.href.search("vine.co/v/") >= 0 && !vine_injected) {
-            vine_injected = true;
-
-            i2d_onload(function() {
-                var config_el = document.getElementById("configuration");
-                if (!config_el) {
-                    return;
-                }
-
-                var config = JSON.parse(config_el.innerHTML);
-                if (!config || typeof config !== "object") {
-                    return;
-                }
-
-                if (!("post" in config) || !("videoUrls" in config.post)) {
-                    return;
-                }
-
-                for (var i = 0; i < config.post.videoUrls.length; i++) {
-                    var videourl = config.post.videoUrls[i];
+        if (("location" in window) && window.location && window.location.href.search("vine.co/v/") >= 0) {
+            var show_video_urls = function(videourls) {
+                for (var i = 0; i < videourls.length; i++) {
+                    var videourl = videourls[i];
 
                     var formatstr = "[";
                     formatstr += videourl.format + ":";
@@ -627,7 +610,53 @@
 
                     i2d_show_url('vine', videourl.videoUrl, formatstr);
                 }
-            });
+            };
+
+            if (window.location.href.search("/card" ) >= 0 && !("vine_card" in injected_set)) {
+                injected_set["vine_card"] = true;
+
+                i2d_onload(function() {
+                    var config_el = document.getElementById("configuration");
+                    if (!config_el) {
+                        return;
+                    }
+
+                    var config = JSON.parse(config_el.innerHTML);
+                    if (!config || typeof config !== "object") {
+                        return;
+                    }
+
+                    if (!("post" in config) || !("videoUrls" in config.post)) {
+                        return;
+                    }
+
+                    show_video_urls(config.post.videoUrls);
+                });
+            } else if (!("vine_video" in injected_set)) {
+                injected_set["vine_video"] = true;
+
+                i2d_onload(function() {
+                    var scripts = document.getElementsByTagName("script");
+                    if (scripts.length === 0)
+                        return;
+
+                    var thescript = null;
+                    for (var i = 0; i < scripts.length; i++) {
+                        if (scripts[i].innerHTML.search("window.POST_DATA") < 0) {
+                            continue;
+                        }
+
+                        thescript = scripts[i];
+                        break;
+                    }
+
+                    var config;
+                    eval(thescript.innerHTML.replace("window.POST_DATA", "config"));
+
+                    var videourls = config[Object.keys(config)[0]].videoUrls;
+                    show_video_urls(videourls);
+                });
+            }
         }
 
         if ("jQuery" in window) {
