@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Inject2Download
 // @namespace    http://lkubuntu.wordpress.com/
-// @version      0.2.5.3
+// @version      0.2.5.4
 // @description  Simple media download script
 // @author       Anonymous Meerkat
 // @include      *
@@ -137,6 +137,14 @@
             return;
 
         inject("jQuery.fn." + name, value);
+    }
+
+    function i2d_onload(f) {
+        if (document.readyState === "loading") {
+            document.addEventListener("DOMContentLoaded", f);
+        } else {
+            f();
+        }
     }
 
 
@@ -482,8 +490,9 @@
             });
 
             add_script(i2d_show_url.toString() +
+                       i2d_onload.toString() +
                        get_script_str(function() {
-                            document.addEventListener("DOMContentLoaded", function() {
+                            i2d_onload(function() {
                                 var els = document.getElementsByClassName("video-js");
                                 for (var i = 0; i < els.length; i++) {
                                     var my_el = els[i];
@@ -567,7 +576,7 @@
         if (("location" in window) && window.location && window.location.href.search("twitter.com/i/videos") >= 0 && !twitter_injected) {
             twitter_injected = true;
 
-            document.addEventListener("DOMContentLoaded", function() {
+            i2d_onload(function() {
                 var pc = document.getElementById('playerContainer');
                 if (!pc) {
                     return;
@@ -589,7 +598,7 @@
         if (("location" in window) && window.location && window.location.href.search("vine.co/v/") >= 0 && !vine_injected) {
             vine_injected = true;
 
-            document.addEventListener("DOMContentLoaded", function() {
+            i2d_onload(function() {
                 var config_el = document.getElementById("configuration");
                 if (!config_el) {
                     return;
@@ -724,7 +733,7 @@
         i2d_main(e.target);
     });
 
-    document.addEventListener("DOMContentLoaded", function() {
+    i2d_onload(function() {
         var get_raws = function() {
             var audios = [].slice.call(document.getElementsByTagName("audio"));
             var videos = [].slice.call(document.getElementsByTagName("video"));
