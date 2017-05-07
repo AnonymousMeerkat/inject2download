@@ -563,6 +563,43 @@
                        "}");
         }
 
+        if ("bitmovin" in window && !window.bitmovin.INJECTED) {
+            inject("bitmovin.player", function() {
+                var result = oldvariable.apply(this, arguments);
+
+                var check_sources = function(x) {
+                    if (typeof x === "object") {
+                        if ("source" in x) {
+                            var sourceobj = x.source
+                            for (var source in sourceobj) {
+                                i2d_show_url("bitmovin", sourceobj[source], source);
+                            }
+                        }
+                    }
+                }
+
+                if ("setup" in result) {
+                    var old_bitmovin_setup = result.setup;
+                    result.setup = function() {
+                        check_sources(arguments[0]);
+
+                        return old_bitmovin_setup.apply(this, arguments);
+                    };
+                }
+
+                if ("load" in result) {
+                    var old_bitmovin_load = result.load;
+                    result.load = function() {
+                        check_sources({source: arguments[0]});
+
+                        return old_bitmovin_load.apply(this, arguments);
+                    }
+                }
+
+                return result;
+            });
+        }
+
         if (("location" in window) && window.location && window.location.host.search("forvo") >= 0 && "createAudioObject" in window && !window.createAudioObject.INJECTED) {
             inject("createAudioObject", function(id, mp3, ogg) {
                 i2d_show_url("forvo", mp3, "mp3");
