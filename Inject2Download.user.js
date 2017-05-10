@@ -567,12 +567,39 @@
             inject("bitmovin.player", function() {
                 var result = oldvariable.apply(this, arguments);
 
+                var check_progressive = function(progressive) {
+                    if (typeof progressive === "string") {
+                        i2d_show_url("bitmovin", progressive, "progressive");
+                    } else if (progressive instanceof Array) {
+                        for (var i = 0; i < progressive.length; i++) {
+                            check_progressive(progressive[i]);
+                        }
+                    } else if (typeof progressive === "object") {
+                        var str = "";
+                        if (progressive.label)
+                            str += "[" + progressive.label + "] ";
+                        if (progressive.bitrate)
+                            str += progressive.bitrate;
+
+                        i2d_show_url("bitmovin", progressive.url, str);
+                    }
+                };
+
                 var check_sources = function(x) {
                     if (typeof x === "object") {
                         if ("source" in x) {
-                            var sourceobj = x.source
-                            for (var source in sourceobj) {
-                                i2d_show_url("bitmovin", sourceobj[source], source);
+                            var sourceobj = x.source;
+
+                            if (sourceobj.progressive) {
+                                check_progressive(sourceobj.progressive);
+                            }
+
+                            if (sourceobj.dash) {
+                                i2d_show_url("bitmovin", sourceobj.dash, "dash");
+                            }
+
+                            if (sourceobj.hls) {
+                                i2d_show_url("bitmovin", sourceobj.hls, "hls");
                             }
                         }
                     }
@@ -593,11 +620,11 @@
                         check_sources({source: arguments[0]});
 
                         return old_bitmovin_load.apply(this, arguments);
-                    }
+                    };
                 }
 
                 return result;
-            });
+            }, ["bitdash"]);
         }
 
         if (("location" in window) && window.location && window.location.host.search("forvo") >= 0 && "createAudioObject" in window && !window.createAudioObject.INJECTED) {
