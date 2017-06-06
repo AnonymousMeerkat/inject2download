@@ -63,7 +63,7 @@
             el.style.background = "white";
             el.style.top = "0px";
             el.style.left = "0px";
-            el.style.zIndex = 999999;
+            el.style.zIndex = Number.MAX_SAFE_INTEGER;
             el.style.color = "black";
             el.style.overflow = "scroll";
             el.ondblclick = function() {
