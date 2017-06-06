@@ -189,6 +189,9 @@
                         if ("label" in x)
                             label += "[" + x.label + "]";
 
+                        if ("kind" in x)
+                            label += "(" + x.kind + ")";
+
                         if ("streamer" in x) {
                             i2d_show_url("jwplayer", x.streamer, "[stream]" + label);
                         }
@@ -203,6 +206,10 @@
 
                         if ("playlist" in x) {
                             check_sources(x.playlist);
+                        }
+
+                        if ("tracks" in x) {
+                            check_sources(x.tracks);
                         }
                     } else if (typeof x === "string") {
                         i2d_show_url("jwplayer", x);
@@ -850,13 +857,23 @@
                         i2d_show_url(basename, el.src);
 
                     for (var x = 0; x < el.children.length; x++) {
-                        if (els[i].children[x].tagName.toLowerCase() !== "source") {
+                        if (els[i].children[x].tagName.toLowerCase() !== "source" &&
+                            els[i].children[x].tagName.toLowerCase() !== "track") {
                             continue;
                         }
 
-                        var type = null;
+                        var type = "";
                         if (el.children[x].type)
-                            type = el.children[x].type;
+                            type += "[" + el.children[x].type + "]";
+
+                        if (el.children[x].label)
+                            type += "[" + el.children[x].label + "]";
+
+                        if (el.children[x].srclang)
+                            type += "[" + el.children[x].srclang + "]";
+
+                        if (el.children[x].kind)
+                            type += "(" + el.children[x].kind + ")";
 
                         if (el.children[x].src)
                             i2d_show_url(basename, el.children[x].src, type);
