@@ -22,6 +22,14 @@
             return a.href;
         }
 
+        function run_on_load(f) {
+            if (document.readyState === "complete" || document.readyState === "loaded") {
+                f();
+            } else {
+                document.addEventListener('DOMContentLoaded', f, false);
+            }
+        }
+
         if (!description)
             description = "";
 
@@ -52,33 +60,54 @@
 
         console.log("[i2d] " + text + newurl);
 
-        var el = document.getElementById("i2d-popup");
-        if (!el) {
-            el = document.createElement("div");
-            //el.style.position = "absolute";
-            el.style.width = "max(60%, 100em)";
-            el.style.height = "max(60%, 100em)";
-            el.style.maxWidth = "100%";
-            el.style.maxHeight = "100%";
-            el.style.background = "white";
-            el.style.top = "0px";
-            el.style.left = "0px";
-            el.style.zIndex = Number.MAX_SAFE_INTEGER;
-            el.style.color = "black";
-            el.style.overflow = "scroll";
-            el.ondblclick = function() {
-                el.parentElement.removeChild(el);
-            };
-            el.innerHTML = "Double click to close<br />";
-            el.id = "i2d-popup";
-            document.body.appendChild(el);
-        }
-        el.innerHTML += text + "<a href='" + newurl + "' style='color:blue'>" + newurl + "</a><br />";
+        run_on_load(function() {
+            var el = document.getElementById("i2d-popup");
+            var elspan = document.getElementById("i2d-popup-x");
+            if (!el) {
+                el = document.createElement("div");
+                //el.style.position = "absolute";
+                el.style.width = "max(60%, 100em)";
+                el.style.height = "max(60%, 100em)";
+                el.style.maxWidth = "100%";
+                el.style.maxHeight = "100%";
+                el.style.background = "white";
+                el.style.top = "0px";
+                el.style.left = "0px";
+                el.style.zIndex = Number.MAX_SAFE_INTEGER - 1;
+                el.style.color = "black";
+                el.style.overflow = "scroll";
+                /*el.ondblclick = function() {
+                  el.parentElement.removeChild(el);
+                  };*/
+                elspan = document.createElement("span");
+                elspan.style.fontSize = "130%";
+                elspan.style.cursor = "pointer";
+                elspan.style.color = "#900";
+                elspan.style.padding = ".1em";
+                elspan.id = "i2d-popup-x";
+                elspan.innerHTML = '[---close---]';
+                elspan.style.textDecoration = "underline";
+                el.innerHTML = "<br style='line-height:200%' />";
+                el.id = "i2d-popup";
+                document.body.appendChild(el);
 
-        // XXX: why is this needed? test: http://playbb.me/embed.php?w=718&h=438&vid=at/nw/flying_witch_-_01.mp4, animeplus.tv
-        document.body.removeChild(el);
-        el.style.position = "absolute";
-        document.body.appendChild(el);
+                elspan.onclick = function() {
+                    var el = document.getElementById("i2d-popup");
+                    el.parentElement.removeChild(el);
+                };
+            }
+            el.innerHTML += text + "<a href='" + newurl + "' style='color:blue'>" + newurl + "</a><br />";
+
+            // XXX: why is this needed? test: http://playbb.me/embed.php?w=718&h=438&vid=at/nw/flying_witch_-_01.mp4, animeplus.tv
+            document.body.removeChild(el);
+            el.style.position = "absolute";
+            document.body.appendChild(el);
+
+            if (document.getElementById("i2d-popup-x"))
+                document.getElementById("i2d-popup-x").parentElement.removeChild(document.getElementById("i2d-popup-x"));
+
+            el.insertBefore(elspan, el.firstChild);
+        });
     }
 
 
