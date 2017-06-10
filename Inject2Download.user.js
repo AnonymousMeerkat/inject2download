@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Inject2Download
 // @namespace    http://lkubuntu.wordpress.com/
-// @version      0.2.6
+// @version      0.2.6.1
 // @description  Simple media download script
 // @author       Anonymous Meerkat
 // @include      *
@@ -87,7 +87,7 @@
                 elspan.id = "i2d-popup-x";
                 elspan.innerHTML = '[---close---]';
                 elspan.style.textDecoration = "underline";
-                el.innerHTML = "<br style='line-height:200%' />";
+                el.innerHTML = "<br style='line-height:150%' />";
                 el.id = "i2d-popup";
                 document.body.appendChild(el);
 
