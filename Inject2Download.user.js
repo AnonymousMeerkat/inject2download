@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Inject2Download
 // @namespace    http://lkubuntu.wordpress.com/
-// @version      0.2.6.1
+// @version      0.2.6.2
 // @description  Simple media download script
 // @author       Anonymous Meerkat
 // @include      *
@@ -129,12 +129,38 @@
     }
 
     function inject(variable, newvalue, aliases) {
+        if (variable instanceof Array) {
+            for (var i = 0; i < variable.length; i++) {
+                inject(variable[i], newvalue, aliases);
+            }
+            return;
+        }
+
         console.log("[i2d] injecting " + variable);
         if (!aliases)
             aliases = [];
 
+        var initobjects = "";
+        var subvariable = variable;
+        var subindex = 0;
+        while (true) {
+            var index = subvariable.indexOf(".");
+            var breakme = false;
+            if (index < 0) {
+                index = subvariable.length;
+                breakme = true;
+            }
+            subvariable = subvariable.substr(index + 1);
+            subindex += index + 1;
+            var subname = variable.substr(0, subindex - 1);
+            initobjects += "if (!" + subname + ") {" + subname + " = {};}\n";
+            if (breakme)
+                break;
+        }
+
         add_script(i2d_show_url.toString() + "\n" +
-                   "if (!(window." + variable + ".INJECTED)) {\n" +
+                   initobjects + "\n" +
+                   "if (('" + variable + "' in window) && !(window." + variable + ".INJECTED)) {\n" +
                    "var oldvariable = window." + variable + ";\n" +
                    "var oldvariable_keys = Object.keys(oldvariable);\n" +
                    "window." + variable + " = " + newvalue.toString() + ";\n" +
@@ -152,6 +178,7 @@
 
     function jquery_plugin_exists(name) {
         if (!("jQuery" in window) ||
+            typeof "jQuery" !== "function" ||
             !("fn" in window.jQuery) ||
             !(name in window.jQuery.fn))
             return false;
@@ -600,7 +627,7 @@
         }
 
         if ("bitmovin" in window && !window.bitmovin.INJECTED) {
-            inject("bitmovin.player", function() {
+            inject(["bitmovin.player", "bitdash", "bitmovinPlayer"], function() {
                 var result = oldvariable.apply(this, arguments);
 
                 var check_progressive = function(progressive) {
@@ -639,7 +666,7 @@
                             }
                         }
                     }
-                }
+                };
 
                 if ("setup" in result) {
                     var old_bitmovin_setup = result.setup;
@@ -660,7 +687,7 @@
                 }
 
                 return result;
-            }, ["bitdash"]);
+            });
         }
 
         if (("location" in window) && window.location && window.location.host.search("forvo") >= 0 && "createAudioObject" in window && !window.createAudioObject.INJECTED) {
