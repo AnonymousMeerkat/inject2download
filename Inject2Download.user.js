@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Inject2Download
 // @namespace    http://lkubuntu.wordpress.com/
-// @version      0.2.6.3
+// @version      0.2.6.4
 // @description  Simple media download script
 // @author       Anonymous Meerkat
 // @include      *
@@ -165,7 +165,7 @@
 
         add_script(i2d_show_url.toString() + "\n" +
                    initobjects + "\n" +
-                   "if (('" + variable + "' in window) && !(window." + variable + ".INJECTED)) {\n" +
+                   "if ((window." + variable + " !== undefined) && !(window." + variable + ".INJECTED)) {\n" +
                    "var oldvariable = window." + variable + ";\n" +
                    "var oldvariable_keys = Object.keys(oldvariable);\n" +
                    "window." + variable + " = " + newvalue.toString() + ";\n" +
@@ -183,10 +183,11 @@
 
     function jquery_plugin_exists(name) {
         if (!("jQuery" in window) ||
-            typeof "jQuery" !== "function" ||
+            typeof window.jQuery !== "function" ||
             !("fn" in window.jQuery) ||
             !(name in window.jQuery.fn))
             return false;
+
 
         return true;
     }
