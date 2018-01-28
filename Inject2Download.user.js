@@ -64,6 +64,7 @@
         run_on_load(function() {
             var el = document.getElementById("i2d-popup");
             var elspan = document.getElementById("i2d-popup-x");
+            var eldiv = document.getElementById("i2d-popup-div");
             if (!el) {
                 el = document.createElement("div");
                 //el.style.position = "absolute";
@@ -90,18 +91,31 @@
                 elspan.style.color = "#900";
                 elspan.style.padding = ".1em";
                 elspan.id = "i2d-popup-x";
-                elspan.innerHTML = '[---close---]';
+                elspan.innerHTML = '[show]';
                 elspan.style.textDecoration = "underline";
                 el.innerHTML = "<br style='line-height:150%' />";
                 el.id = "i2d-popup";
+                eldiv = document.createElement("div");
+                eldiv.id = "i2d-popup-div";
+                eldiv.style.display = "none";
+                el.appendChild(eldiv);
                 document.body.appendChild(el);
 
                 elspan.onclick = function() {
-                    var el = document.getElementById("i2d-popup");
-                    el.parentElement.removeChild(el);
+                    /*var el = document.getElementById("i2d-popup");
+                      el.parentElement.removeChild(el);*/
+                    var eldiv = document.getElementById("i2d-popup-div");
+                    var elspan = document.getElementById("i2d-popup-x");
+                    if (eldiv.style.display === "none") {
+                        elspan.innerHTML = '[hide]';
+                        eldiv.style.display = "block";
+                    } else {
+                        elspan.innerHTML = '[show]';
+                        eldiv.style.display = "none";
+                    }
                 };
             }
-            el.innerHTML += text + "<a href='" + newurl + "' style='color:blue'>" + newurl + "</a><br />";
+            eldiv.innerHTML += text + "<a href='" + newurl + "' style='color:blue'>" + newurl + "</a><br />";
 
             // XXX: why is this needed? test: http://playbb.me/embed.php?w=718&h=438&vid=at/nw/flying_witch_-_01.mp4, animeplus.tv
             document.body.removeChild(el);
