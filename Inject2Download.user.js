@@ -895,6 +895,20 @@
         i2d_main(e.target);
     });
 
+    var script_observer = new MutationObserver(function(mutations, observer) {
+        for (var i = 0; i < mutations.length; i++) {
+            if (mutations[i].addedNodes) {
+                for (var x = 0; x < mutations[i].addedNodes.length; x++) {
+                    if (mutations[i].addedNodes[x].nodeName !== "SCRIPT")
+                        continue;
+                    i2d_main(mutations[i].addedNodes[x]);
+                }
+            }
+        }
+    });
+
+    script_observer.observe(document.documentElement, {childList: true, subtree: true});
+
     i2d_onload(function() {
         var get_raws = function() {
             var audios = [].slice.call(document.getElementsByTagName("audio"));
