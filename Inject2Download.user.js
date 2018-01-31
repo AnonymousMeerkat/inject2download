@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Inject2Download
 // @namespace    http://lkubuntu.wordpress.com/
-// @version      0.2.7.4
+// @version      0.2.7.5
 // @description  Simple media download script
 // @author       Anonymous Meerkat
 // @include      *
@@ -955,19 +955,81 @@
         i2d_main(e.target);
     });
 
-    var script_observer = new MutationObserver(function(mutations, observer) {
+    var process_raw_tag = function(el) {
+        var basename = "raw ";
+
+        if (el.tagName.toLowerCase() === "video") {
+            basename += "video";
+        } else {
+            basename += "audio";
+        }
+
+        if (el.id)
+            basename += ": #" + el.id;
+
+        var show_updates = function() {
+            if (el.src)
+                i2d_show_url(basename, el.src);
+
+            for (var x = 0; x < el.children.length; x++) {
+                if (els[i].children[x].tagName.toLowerCase() !== "source" &&
+                    els[i].children[x].tagName.toLowerCase() !== "track") {
+                    continue;
+                }
+
+                var type = "";
+                if (el.children[x].type)
+                    type += "[" + el.children[x].type + "]";
+
+                if (el.children[x].label)
+                    type += "[" + el.children[x].label + "]";
+
+                if (el.children[x].srclang)
+                    type += "[" + el.children[x].srclang + "]";
+
+                if (el.children[x].kind)
+                    type += "(" + el.children[x].kind + ")";
+
+                if (el.children[x].src)
+                    i2d_show_url(basename, el.children[x].src, type);
+            }
+        };
+
+        var observer = new MutationObserver(show_updates);
+        observer.observe(el, { attributes: true, childList: true });
+
+        show_updates();
+    };
+
+    var process_el = function(el) {
+        if (el.nodeName === "SCRIPT") {
+            i2d_main(el);
+        } else if (el.nodeName === "VIDEO" ||
+                   el.nodeName === "AUDIO") {
+            process_raw_tag(el);
+        }
+
+        if (el.children) {
+            for (var i = 0; i < el.children.length; i++) {
+                process_el(el.children[i]);
+            }
+        }
+    };
+
+    var script_observer_cb = function(mutations, observer) {
         for (var i = 0; i < mutations.length; i++) {
             if (mutations[i].addedNodes) {
                 for (var x = 0; x < mutations[i].addedNodes.length; x++) {
-                    if (mutations[i].addedNodes[x].nodeName !== "SCRIPT")
-                        continue;
-                    i2d_main(mutations[i].addedNodes[x]);
+                    var addednode = mutations[i].addedNodes[x];
+                    process_el(addednode);
                 }
             }
         }
-    });
+    };
 
-    script_observer.observe(document.documentElement, {childList: true, subtree: true});
+    var script_observer = new MutationObserver(script_observer_cb);
+
+    script_observer.observe(document, {childList: true, subtree: true});
 
     i2d_onload(function() {
         var get_raws = function() {
@@ -1023,7 +1085,7 @@
             }
         };
 
-        get_raws();
+        //get_raws();
 
         i2d_main();
     });
