@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Inject2Download
 // @namespace    http://lkubuntu.wordpress.com/
-// @version      0.2.7
+// @version      0.2.7.1
 // @description  Simple media download script
 // @author       Anonymous Meerkat
 // @include      *
@@ -212,6 +212,25 @@
             return;
 
         inject("jQuery.fn." + name, value);
+    }
+
+    function inject_url(pattern, func) {
+        // https://stackoverflow.com/questions/629671/how-can-i-intercept-xmlhttprequests-from-a-greasemonkey-script
+        console.log("[i2d] injecting URL: " + pattern);
+        (function(open) {
+            window.XMLHttpRequest.prototype.open = function() {
+                if (arguments[1] &&
+                    arguments[1].match(pattern)) {
+                    var url = arguments[1];
+                    this.addEventListener("readystatechange", function() {
+                        if (this.readyState === 4) {
+                            func.bind(this)(url);
+                        }
+                    });
+                }
+                open.apply(this, arguments);
+            };
+        })(window.XMLHttpRequest.prototype.open);
     }
 
     function i2d_onload(f) {
@@ -707,6 +726,16 @@
                 }
 
                 return result;
+            });
+        }
+
+        if (("location" in window) && window.location && window.location.host.search("soundcloud.com") >= 0) {
+            inject_url(/api\.soundcloud\.com\/.*?\/tracks\/[0-9]*\/streams/, function(url) {
+                var track = url.match(/\/tracks\/([0-9]*)\//);
+                var parsed = JSON.parse(this.responseText);
+                for (var item in parsed) {
+                    i2d_show_url("soundcloud", parsed[item], "[" + item + "] " + track[1]);
+                }
             });
         }
 
