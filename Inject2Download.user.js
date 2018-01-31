@@ -729,7 +729,9 @@
             });
         }
 
-        if (("location" in window) && window.location && window.location.host.search("soundcloud.com") >= 0) {
+        if (("location" in window) && window.location && window.location.host.search("soundcloud.com") >= 0 && !("soundcloud" in injected_set)) {
+            injected_set["soundcloud"] = true;
+
             inject_url(/api\.soundcloud\.com\/.*?\/tracks\/[0-9]*\/streams/, function(url) {
                 var track = url.match(/\/tracks\/([0-9]*)\//);
                 var parsed = JSON.parse(this.responseText);
