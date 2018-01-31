@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Inject2Download
 // @namespace    http://lkubuntu.wordpress.com/
-// @version      0.2.7.2
+// @version      0.2.7.3
 // @description  Simple media download script
 // @author       Anonymous Meerkat
 // @include      *
@@ -23,11 +23,18 @@
         }
 
         function run_on_load(f) {
-            if (document.readyState === "complete" || document.readyState === "loaded") {
+            if (document.readyState === "complete" ||
+                document.readyState === "interactive") {
                 f();
             } else {
+                document.onreadystatechange = function() {
+                    if (document.readyState === "complete" ||
+                        document.readyState === "interactive") {
+                        f();
+                    }
+                };
                 //document.addEventListener('DOMContentLoaded', f, false);
-                window.addEventListener('load', f, false);
+                //window.addEventListener('load', f, false);
             }
         }
 
