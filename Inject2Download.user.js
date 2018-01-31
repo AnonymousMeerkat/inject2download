@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Inject2Download
 // @namespace    http://lkubuntu.wordpress.com/
-// @version      0.2.7.1
+// @version      0.2.7.2
 // @description  Simple media download script
 // @author       Anonymous Meerkat
 // @include      *
@@ -115,7 +115,11 @@
                     }
                 };
             }
-            eldiv.innerHTML += text + "<a href='" + newurl + "' style='color:blue'>" + newurl + "</a><br />";
+            var shorturl = newurl;
+            if (shorturl.length > 100) {
+                shorturl = shorturl.substring(0, 99) + "&hellip;";
+            }
+            eldiv.innerHTML += text + "<a href='" + newurl + "' style='color:blue' title='" + newurl + "'>" + shorturl + "</a><br />";
 
             // XXX: why is this needed? test: http://playbb.me/embed.php?w=718&h=438&vid=at/nw/flying_witch_-_01.mp4, animeplus.tv
             document.body.removeChild(el);
