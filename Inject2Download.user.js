@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Inject2Download
 // @namespace    http://lkubuntu.wordpress.com/
-// @version      0.2.7.5
+// @version      0.2.8
 // @description  Simple media download script
 // @author       Anonymous Meerkat
 // @include      *
@@ -744,6 +744,47 @@
             });
         }
 
+        if ("dashjs" in window && window.dashjs.MediaPlayer && !window.dashjs.MediaPlayer.INJECTED) {
+            inject("dashjs.MediaPlayer", function() {
+                var outer_result = oldvariable.apply(this, arguments);
+
+                var oldcreate = outer_result.create;
+                outer_result.create = function() {
+                    var result = oldcreate.apply(this, arguments);
+
+                    var old_attachsource = result.attachSource;
+                    result.attachSource = function(url) {
+                        i2d_show_url("dash.js", url);
+                        return old_attachsource.apply(this, arguments);
+                    };
+
+                    return result;
+                };
+
+                return outer_result;
+            });
+        }
+
+        if ("Hls" in window && window.Hls && !window.Hls.INJECTED) {
+            var old_loadsource = window.Hls.prototype.loadSource;
+            window.Hls.prototype.loadSource = function(url) {
+                i2d_show_url("hls.js", url);
+                return old_loadsource.apply(this, arguments);
+            };
+            window.Hls.INJECTED = true;
+        }
+
+        if ("flvjs" in window && window.flvjs.createPlayer && !window.flvjs.createPlayer.INJECTED) {
+            inject("flvjs.createPlayer", function(options) {
+                if (options) {
+                    if ("url" in options) {
+                        i2d_show_url("flv.js", options.url);
+                    }
+                }
+                return oldvariable.apply(this, arguments);
+            });
+        }
+
         if (("location" in window) && window.location && window.location.host.search("soundcloud.com") >= 0 && !("soundcloud" in injected_set)) {
             injected_set["soundcloud"] = true;
 
@@ -972,8 +1013,8 @@
                 i2d_show_url(basename, el.src);
 
             for (var x = 0; x < el.children.length; x++) {
-                if (els[i].children[x].tagName.toLowerCase() !== "source" &&
-                    els[i].children[x].tagName.toLowerCase() !== "track") {
+                if (el.children[x].tagName.toLowerCase() !== "source" &&
+                    el.children[x].tagName.toLowerCase() !== "track") {
                     continue;
                 }
 
@@ -1022,6 +1063,12 @@
                 for (var x = 0; x < mutations[i].addedNodes.length; x++) {
                     var addednode = mutations[i].addedNodes[x];
                     process_el(addednode);
+                }
+            }
+            if (mutations[i].removedNodes) {
+                for (var x = 0; x < mutations[i].removedNodes.length; x++) {
+                    if (mutations[i].removedNodes[x].nodeName === "SCRIPT")
+                        i2d_main(mutations[i].removedNodes[x]);
                 }
             }
         }
