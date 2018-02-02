@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Inject2Download
 // @namespace    http://lkubuntu.wordpress.com/
-// @version      0.2.8
+// @version      0.2.8.1
 // @description  Simple media download script
 // @author       Anonymous Meerkat
 // @include      *
@@ -75,7 +75,9 @@
         run_on_load(function() {
             var el = document.getElementById("i2d-popup");
             var elspan = document.getElementById("i2d-popup-x");
+            var elspan1 = document.getElementById("i2d-popup-close");
             var eldiv = document.getElementById("i2d-popup-div");
+            var eldivhold = document.getElementById("i2d-popup-div-holder");
             if (!el) {
                 el = document.createElement("div");
                 //el.style.position = "absolute";
@@ -96,20 +98,44 @@
                 /*el.ondblclick = function() {
                   el.parentElement.removeChild(el);
                   };*/
+                eldivhold = document.createElement("div");
+                eldivhold.id = "i2d-popup-span-holder";
+                eldivhold.style.width = "100%";
+                eldivhold.style.display = "block";
+                eldivhold.style.overflow = "auto";
+                eldivhold.style.paddingBottom = ".5em";
+
                 elspan = document.createElement("span");
                 elspan.style.fontSize = "130%";
                 elspan.style.cursor = "pointer";
                 elspan.style.color = "#900";
                 elspan.style.padding = ".1em";
+                elspan.style.float = "left";
+                elspan.style.display = "inline";
                 elspan.id = "i2d-popup-x";
                 elspan.innerHTML = '[show]';
                 elspan.style.textDecoration = "underline";
-                el.innerHTML = "<br style='line-height:150%' />";
+                eldivhold.appendChild(elspan);
+
+                elspan1 = document.createElement("span");
+                elspan1.style.fontSize = "130%";
+                elspan1.style.cursor = "pointer";
+                elspan1.style.color = "#900";
+                elspan1.style.padding = ".1em";
+                elspan1.style.float = "right";
+                elspan1.style.display = "none";
+                elspan1.id = "i2d-popup-close";
+                elspan1.innerHTML = '[close]';
+                elspan1.style.textDecoration = "underline";
+                eldivhold.appendChild(elspan1);
+
+                //el.innerHTML = "<br style='line-height:150%' />";
                 el.id = "i2d-popup";
                 eldiv = document.createElement("div");
                 eldiv.id = "i2d-popup-div";
                 eldiv.style.display = "none";
                 el.appendChild(eldiv);
+                el.insertBefore(eldivhold, el.firstChild);
                 document.body.appendChild(el);
 
                 elspan.onclick = function() {
@@ -120,10 +146,17 @@
                     if (eldiv.style.display === "none") {
                         elspan.innerHTML = '[hide]';
                         eldiv.style.display = "block";
+                        elspan1.style.display = "inline";
                     } else {
                         elspan.innerHTML = '[show]';
                         eldiv.style.display = "none";
+                        elspan1.style.display = "none";
                     }
+                };
+
+                elspan1.onclick = function() {
+                    var el = document.getElementById("i2d-popup");
+                    el.parentElement.removeChild(el);
                 };
             }
             var shorturl = newurl;
@@ -137,10 +170,12 @@
             el.style.position = "absolute";
             document.body.appendChild(el);
 
-            if (document.getElementById("i2d-popup-x"))
-                document.getElementById("i2d-popup-x").parentElement.removeChild(document.getElementById("i2d-popup-x"));
+            /*if (document.getElementById("i2d-popup-x"))
+                document.getElementById("i2d-popup-x").parentElement.removeChild(document.getElementById("i2d-popup-x"));*/
 
-            el.insertBefore(elspan, el.firstChild);
+            /*el.insertBefore(elspan, el.firstChild);
+            el.insertBefore(elspan1, el.firstChild);*/
+            //el.insertBefore(eldivhold, el.firstChild);
         });
     }
 
@@ -766,6 +801,7 @@
         }
 
         if ("Hls" in window && window.Hls && !window.Hls.INJECTED) {
+            console.log("[i2d] injecting Hls");
             var old_loadsource = window.Hls.prototype.loadSource;
             window.Hls.prototype.loadSource = function(url) {
                 i2d_show_url("hls.js", url);
