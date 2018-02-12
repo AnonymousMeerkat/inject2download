@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Inject2Download
 // @namespace    http://lkubuntu.wordpress.com/
-// @version      0.2.8.1
+// @version      0.2.8.2
 // @description  Simple media download script
 // @author       Anonymous Meerkat
 // @include      *
@@ -113,7 +113,7 @@
                 elspan.style.float = "left";
                 elspan.style.display = "inline";
                 elspan.id = "i2d-popup-x";
-                elspan.innerHTML = '[show]';
+                elspan.innerHTML = '[hide]';
                 elspan.style.textDecoration = "underline";
                 eldivhold.appendChild(elspan);
 
@@ -123,7 +123,8 @@
                 elspan1.style.color = "#900";
                 elspan1.style.padding = ".1em";
                 elspan1.style.float = "right";
-                elspan1.style.display = "none";
+                //elspan1.style.display = "none";
+                elspan1.style.display = "inline";
                 elspan1.id = "i2d-popup-close";
                 elspan1.innerHTML = '[close]';
                 elspan1.style.textDecoration = "underline";
@@ -133,7 +134,8 @@
                 el.id = "i2d-popup";
                 eldiv = document.createElement("div");
                 eldiv.id = "i2d-popup-div";
-                eldiv.style.display = "none";
+                //eldiv.style.display = "none";
+                eldiv.style.display = "block";
                 el.appendChild(eldiv);
                 el.insertBefore(eldivhold, el.firstChild);
                 document.body.appendChild(el);
