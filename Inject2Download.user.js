@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Inject2Download
 // @namespace    http://lkubuntu.wordpress.com/
-// @version      0.2.8.2
+// @version      0.2.8.3
 // @description  Simple media download script
 // @author       Anonymous Meerkat
 // @include      *
@@ -85,6 +85,8 @@
                 el.style.height = "max(60%, 100em)";
                 el.style.maxWidth = "100%";
                 el.style.maxHeight = "100%";
+                el.style.height = "auto";
+                el.style.width = "auto";
                 el.style.background = "white";
                 el.style.top = "0px";
                 el.style.left = "0px";
