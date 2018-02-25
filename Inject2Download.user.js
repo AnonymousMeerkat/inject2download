@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Inject2Download
 // @namespace    http://lkubuntu.wordpress.com/
-// @version      0.2.9
+// @version      0.2.9.1
 // @description  Simple media download script
 // @author       Anonymous Meerkat
 // @include      *
@@ -80,6 +80,7 @@
             var eldivhold = document.getElementById("i2d-popup-div-holder");
             if (!el) {
                 el = document.createElement("div");
+                el.style.all = "initial";
                 //el.style.position = "absolute";
                 el.style.width = "max(60%, 100em)";
                 el.style.height = "max(60%, 100em)";
@@ -97,17 +98,20 @@
                 el.style.lineHeight = "normal";
                 el.style.textAlign = "left";
                 el.style.overflow = "scroll";
+
                 /*el.ondblclick = function() {
                   el.parentElement.removeChild(el);
                   };*/
                 eldivhold = document.createElement("div");
                 eldivhold.id = "i2d-popup-span-holder";
+                eldivhold.style.all = "initial";
                 eldivhold.style.width = "100%";
                 eldivhold.style.display = "block";
                 eldivhold.style.overflow = "auto";
                 eldivhold.style.paddingBottom = ".5em";
 
                 elspan = document.createElement("span");
+                elspan.style.all = "initial";
                 elspan.style.fontSize = "130%";
                 elspan.style.cursor = "pointer";
                 elspan.style.color = "#900";
@@ -120,6 +124,7 @@
                 eldivhold.appendChild(elspan);
 
                 elspan1 = document.createElement("span");
+                elspan1.style.all = "initial";
                 elspan1.style.fontSize = "130%";
                 elspan1.style.cursor = "pointer";
                 elspan1.style.color = "#900";
@@ -135,6 +140,7 @@
                 //el.innerHTML = "<br style='line-height:150%' />";
                 el.id = "i2d-popup";
                 eldiv = document.createElement("div");
+                eldiv.style.all = "initial";
                 eldiv.id = "i2d-popup-div";
                 //eldiv.style.display = "none";
                 eldiv.style.display = "block";
@@ -167,7 +173,23 @@
             if (shorturl.length > 100) {
                 shorturl = shorturl.substring(0, 99) + "&hellip;";
             }
-            eldiv.innerHTML += text + "<a href='" + newurl + "' style='color:blue' title='" + newurl + "'>" + shorturl + "</a><br />";
+            var el_divspan = document.createElement("span");
+            el_divspan.style.all = "initial";
+            el_divspan.innerHTML = text;
+            eldiv.appendChild(el_divspan);
+            var el_a = document.createElement("a");
+            el_a.href = newurl;
+            el_a.style.all = "initial";
+            el_a.style.color = "blue";
+            el_a.style.textDecoration = "underline";
+            el_a.style.cursor = "pointer";
+            el_a.title = newurl;
+            el_a.innerHTML = shorturl;
+            eldiv.appendChild(el_a);
+            var el_br = document.createElement("br");
+            el_br.style.all = "initial";
+            eldiv.appendChild(el_br);
+            //eldiv.innerHTML += text + "<a href='" + newurl + "' style='color:blue' title='" + newurl + "'>" + shorturl + "</a><br />";
 
             // XXX: why is this needed? test: http://playbb.me/embed.php?w=718&h=438&vid=at/nw/flying_witch_-_01.mp4, animeplus.tv
             document.body.removeChild(el);
