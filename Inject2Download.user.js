@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Inject2Download
 // @namespace    http://lkubuntu.wordpress.com/
-// @version      0.2.9.1
+// @version      0.2.9.2
 // @description  Simple media download script
 // @author       Anonymous Meerkat
 // @include      *
@@ -326,6 +326,17 @@
             if ((e.className === "i2d")) {
                 return;
             }
+
+            /*var ourscript = document.createElement("script");
+            ourscript.className = "i2d";
+            ourscript.innerHTML = "i2d_main();" + i2d_main;
+            e.parentElement.insertBefore(ourscript, e.nextSibling);*/
+
+            var old_onload = e.onload;
+            e.onload = function() {
+                i2d_main();
+                return old_onload.apply(this, arguments);
+            };
         }
 
         if ("soundManager" in window && !window.soundManager.INJECTED) {
