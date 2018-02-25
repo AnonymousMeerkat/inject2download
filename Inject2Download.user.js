@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Inject2Download
 // @namespace    http://lkubuntu.wordpress.com/
-// @version      0.2.8.3
+// @version      0.2.9
 // @description  Simple media download script
 // @author       Anonymous Meerkat
 // @include      *
@@ -822,6 +822,43 @@
                     }
                 }
                 return oldvariable.apply(this, arguments);
+            });
+        }
+
+        if ("KollusMediaContainer" in window && window.KollusMediaContainer && !window.KollusMediaContainer.INJECTED) {
+            inject("KollusMediaContainer.createInstance", function(options) {
+                if (options) {
+                    if ("mediaurl" in options) {
+                        var types = [];
+                        if (options.isencrypted)
+                            types.push("encrypted");
+                        if (options.isaudiofiles)
+                            types.push("audio");
+                        else
+                            types.push("video");
+                        i2d_show_url("kollus", options.mediaurl, types.join(":"));
+                    }
+                }
+
+                // Replace flash with HTML5, but it doesn't work for HLS
+                if (false) {
+                    var value = (new KollusMediaContainer(options));
+                    var old_launchFlashPlayer = value.launchFlashPlayer;
+                    value.launchFlashPlayer = function() {
+                        if (options.isencrypted) {
+                            return old_launchflashplayer.apply(this, arguments);
+                        } else if (options.isaudiofile) {
+                            return value.launchHTML5AudioPlayer();
+                        } else {
+                            return value.launchHTML5Player();
+                        }
+                    };
+                    value = value.initialize();
+
+                    return value;
+                } else {
+                    return oldvariable.apply(this, arguments);
+                }
             });
         }
 
