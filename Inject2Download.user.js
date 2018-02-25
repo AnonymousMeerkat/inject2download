@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Inject2Download
 // @namespace    http://lkubuntu.wordpress.com/
-// @version      0.2.9.2
+// @version      0.2.9.3
 // @description  Simple media download script
 // @author       Anonymous Meerkat
 // @include      *
@@ -205,6 +205,137 @@
         });
     }
 
+    function i2d_add_player(options) {
+        var playlist = [];
+        var elements = [];
+        var ret = {};
+
+        /*var videoel = document.createElement("video");
+        videoel.setAttribute("controls", "");
+        options.element.appendChild(videoel);*/
+
+        if (!(options.elements instanceof Array) && !(options.elements instanceof NodeList)) {
+            if (typeof options.elements === "string") {
+                options.elements = document.querySelectorAll(options.elements);
+            } else {
+                options.elements = [options.elements];
+            }
+        }
+        for (var i = 0; i < options.elements.length; i++) {
+            (function(x) {
+                if (!x)
+                    return;
+                var videoel = document.createElement("video");
+                videoel.setAttribute("controls", "");
+                videoel.style.maxWidth = "100%";
+                videoel.style.maxHeight = "100%";
+                videoel.addEventListener("ended", function() {
+                    ret.next_playlist_item();
+                });
+                videoel.addEventListener("error", function() {
+                    ret.next_playlist_item();
+                });
+                /*var stylestr = "";
+                for (var key in options.css) {
+                    stylestr += key + ":" + options.css[key] + ";"
+                }*/
+                for (var key in options.css) {
+                    videoel.style[key] = options.css[key];
+                }
+                //videoel.setAttribute("style", stylestr);
+                if (options.replaceChildren) {
+                    x.innerHTML = "";
+                }
+                if (options.replace) {
+                    x.parentElement.replaceChild(videoel, x);
+                } else {
+                    x.appendChild(videoel);
+                }
+                elements.push(videoel);
+            })(options.elements[i]);
+        }
+        ret.add_urls = function(urls) {
+            if (urls instanceof Array) {
+                for (var i = 0; i < urls.length; i++) {
+                    ret.add_urls(urls[i]);
+                }
+                return;
+            }
+
+            playlist.push(urls);
+            if (playlist.length === 1) {
+                ret.set_url(playlist[0]);
+            }
+        };
+        ret.replace_urls = function(urls) {
+            playlist = [];
+            return ret.add_urls(urls);
+        };
+        var getext = function(url) {
+            return url.replace(/.*\.([^/.?]*)(?:\?.*)?$/, "$1").toLowerCase();
+        };
+        var loadscript = function(variable, url, cb) {
+            if (!(variable in window)) {
+                var script = document.createElement("script");
+                script.src = url;
+                script.onload = cb;
+                document.head.insertBefore(script, document.head.lastChild);
+            } else {
+                cb();
+            }
+        };
+        ret.set_url = function(url) {
+            if (!url)
+                return;
+            switch(getext(url)) {
+                case "flv":
+                    loadscript("flvjs", "https://cdn.jsdelivr.net/npm/flv.js@latest", function() {
+                        var flvPlayer = flvjs.createPlayer({
+                            type: 'flv',
+                            url: url
+                        });
+                        for (var i = 0; i < elements.length; i++) {
+                            flvPlayer.attachMediaElement(elements[i]);
+                        }
+                        flvPlayer.load();
+                    });
+                    break;
+                case "m3u8":
+                    loadscript("Hls", "https://cdn.jsdelivr.net/npm/hls.js@latest", function() {
+                        var hls = new Hls();
+                        hls.loadSource(url);
+                        for (var i = 0; i < elements.length; i++) {
+                            hls.attachMedia(elements[i]);
+                        }
+                    });
+                    break;
+                default:
+                    for (var i = 0; i < elements.length; i++) {
+                        elements[i].src = url;
+                    }
+                    break;
+            }
+        };
+        ret.next_playlist_item = function() {
+            playlist = playlist.slice(1);
+            if (playlist[0])
+                ret.set_url(playlist[0]);
+        };
+        ret.setPlaying = function(playing) {
+            for (var i = 0; i < elements.length; i++) {
+                if (playing)
+                    elements[i].play();
+                else
+                    elements[i].pause();
+            }
+        };
+
+        if (options.urls)
+            ret.add_urls(options.urls);
+
+        return ret;
+    }
+
 
     // Injecting functions
     var get_script_str = function(f) {
@@ -253,7 +384,7 @@
                 break;
         }
 
-        add_script(i2d_show_url.toString() + "\n" +
+        add_script(i2d_show_url.toString() + "\n" + i2d_add_player.toString() + "\n" +
                    initobjects + "\n" +
                    "if ((window." + variable + " !== undefined) && !(window." + variable + ".INJECTED)) {\n" +
                    "var oldvariable = window." + variable + ";\n" +
@@ -335,7 +466,8 @@
             var old_onload = e.onload;
             e.onload = function() {
                 i2d_main();
-                return old_onload.apply(this, arguments);
+                if (old_onload)
+                    return old_onload.apply(this, arguments);
             };
         }
 
@@ -453,6 +585,33 @@
                 var obj_baseurl = null;
                 var els = [];
 
+                var urls = [];
+                var url_pairs = {};
+                var players = {};
+                var add_url = function() {
+                    if (Object.keys(players).length === 0) {
+                        urls.push(arguments[1]);
+                    } else {
+                        for (var key in players) {
+                            players[key].add_urls(arguments[1]);
+                        }
+                    }
+
+                    return i2d_show_url.apply(this, arguments);
+                };
+                var add_url_pair = function(el) {
+                    var newargs = Array.prototype.slice.call(arguments, 1);
+                    if (!(el in players)) {
+                        if (!url_pairs[el])
+                            url_pairs[el] = [];
+                        url_pairs[el].push(newargs[1]);
+                    } else {
+                        players[el].add_urls(newargs[1]);
+                    }
+
+                    return i2d_show_url.apply(this, newargs);
+                };
+
                 function get_url(x) {
                     x = decodeURIComponent(x);
 
@@ -470,7 +629,7 @@
                 function check_sources(x, els, label) {
                     if (typeof x === "string") {
                         if (!x.match(/\.xml$/))
-                            i2d_show_url("flowplayer", get_url(x), label);
+                            add_url("flowplayer", get_url(x), label);
 
                         return;
                     }
@@ -531,7 +690,7 @@
                                 if (x.bitrates[j].bitrate)
                                     description += x.bitrates[j].bitrate;
 
-                                i2d_show_url("flowplayer", get_url(x.bitrates[j].url), description);
+                                add_url("flowplayer", get_url(x.bitrates[j].url), description);
                             }
                         }
                     }
@@ -565,14 +724,18 @@
                         obj_baseurl = els[i].i2d_baseurl;
                 }
 
+                var options = {};
+
                 if (arguments.length >= 3 && typeof arguments[2] === "object") {
                     check_sources(arguments[2], els);
+                    options = arguments[2];
                 } else if (arguments.length >= 3 && typeof arguments[2] === "string") {
-                    i2d_show_url("flowplayer", get_url(arguments[2]));
+                    add_url("flowplayer", get_url(arguments[2]));
                 } else if (arguments.length === 2 && typeof arguments[1] === "object") {
                     check_sources(arguments[1], els);
+                    options = arguments[1];
                 } else if (arguments.length === 2 && typeof arguments[1] === "string") {
-                    i2d_show_url("flowplayer", get_url(arguments[1]));
+                    add_url("flowplayer", get_url(arguments[1]));
                 }
 
                 for (var i = 0; i < els.length; i++) {
@@ -581,8 +744,67 @@
 
                     var href = els[i].getAttribute("href");
                     if (href) {
-                        i2d_show_url("flowplayer", get_url(href), "href");
+                        add_url_pair(els[i], "flowplayer", get_url(href), "href");
                     }
+                }
+
+                if (false) {
+                    oldvariable = function() {
+                        var css = {width: "100%", height: "100%"};
+                        for (var key in options.screen) {
+                            var val = options.screen[key];
+                            switch(key) {
+                                case "height":
+                                case "width":
+                                case "bottom":
+                                case "top":
+                                case "left":
+                                case "right":
+                                    if (typeof val === "number") {
+                                        css[key] = val + "px";
+                                    } else {
+                                        css[key] = val;
+                                    }
+                                    break;
+                                default:
+                                    css[key] = val;
+                                    break;
+                            }
+                        }
+                        for (var i = 0; i < els.length; i++) {
+                            var player_urls = url_pairs[els[i]] || [];
+                            for (var x = 0; x < urls.length; x++) {
+                                player_urls.push(urls[x]);
+                            }
+                            players[els[i]] = i2d_add_player({
+                                elements: els[i],
+                                replaceChildren: true,
+                                urls: player_urls,
+                                css: css
+                            });
+                        }
+
+                        var allp = function(name) {
+                            for (var key in players) {
+                                players[key][name].apply(this, Array.prototype.slice.apply(arguments, 1));
+                            }
+                        };
+
+                        var res = {};
+                        var fns = [
+                            "addClip",
+                            "setPlaylist",
+                            "load",
+                            "playlist",
+                            "play",
+                            "ipad"
+                        ];
+                        for (var i = 0; i < fns.length; i++) {
+                            res[fns[i]] = function(){};
+                        }
+
+                        return res;
+                    };
                 }
 
                 var result = oldvariable.apply(this, arguments);
@@ -613,6 +835,16 @@
                 if ("load" in result) {
                     var old_fplayer_load = result.load;
                     result.load = function() {
+                        if (arguments.length > 0)
+                            check_sources(arguments[0], els);
+
+                        return old_fplayer_load.apply(this, arguments);
+                    };
+                }
+
+                if ("play" in result) {
+                    var old_fplayer_load = result.play;
+                    result.play = function() {
                         if (arguments.length > 0)
                             check_sources(arguments[0], els);
 
@@ -886,6 +1118,7 @@
                             return value.launchHTML5Player();
                         }
                     };
+                    value.isURLHasM3U8 = function(){return false;};
                     value = value.initialize();
 
                     return value;
@@ -1097,6 +1330,12 @@
                            "  return oldmedia.apply(this, arguments);\n" +
                            "}");
             }
+
+            inject_jquery_plugin("flowplayer", function() {
+                var newargs = Array.from(arguments);
+                newargs.unshift(jQuery(this)[0]);
+                return window.flowplayer.apply(this, newargs);
+            });
         }
     }
 
