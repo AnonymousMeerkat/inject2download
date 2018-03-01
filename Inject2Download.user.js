@@ -1,11 +1,14 @@
+// NOTE: This script now requires GM_setValue/getValue for storing preferences
+
 // ==UserScript==
 // @name         Inject2Download
 // @namespace    http://lkubuntu.wordpress.com/
-// @version      0.2.9.4
+// @version      0.3.0
 // @description  Simple media download script
 // @author       Anonymous Meerkat
 // @include      *
-// @grant        none
+// @grant        GM_getValue
+// @grant        GM_setValue
 // @run-at       document-start
 // ==/UserScript==
 
@@ -13,8 +16,203 @@
     "use strict";
 
     var injected_set = {};
+    var did_prefs = false;
+
+    if (unsafeWindow)
+        window = unsafeWindow;
+
+    // Most of these are disabled by default in order to avoid modifying the user experience in unexpected ways
+    var config_template = {
+        simpleplayers: {
+            name: "Replace with native players if possible",
+            options: {
+                "yes": "Yes",
+                "flash": "Only if Flash is used",
+                "no": "No"
+            },
+            default: "no"
+        },
+        noads: {
+            name: "Block ads if possible (using a proper adblocker is highly recommended)",
+            default: false
+        },
+        // TODO: Implement
+        /*download: {
+            name: "Enable downloading via the player itself if possible",
+            default: false
+        },*/
+        blacklist: {
+            name: "Blacklisted domains (one per line)",
+            type: "textarea",
+            default: ""
+        }
+    };
+
+    var config = {};
+
+    for (var key in config_template) {
+        config[key] = config_template[key].default;
+        /*(function(key) {
+            GM.getValue(key).then(
+                function (data) {
+                    if (data !== undefined)
+                        config[key] = data;
+                },
+                function () {}
+            );
+        })(key);*/
+        var data = GM_getValue(key);
+        if (data !== undefined)
+            config[key] = data;
+    }
+
+    var blacklist = config.blacklist.split("\n");
+    var blacklisted = false;
+    var host = window.location.hostname.toLowerCase();
+    for (var i = 0; i < blacklist.length; i++) {
+        var normalized = blacklist[i].replace(/^ */, "").replace(/ *$/, "");
+        if (host === normalized.toLowerCase() ||
+            host.indexOf("." + normalized) === (host.length - normalized.length - 1)) {
+            console.log("[i2d] Blacklisted");
+            blacklisted = true;
+            break;
+        }
+    }
+
+    // Preferences
+    if (window.location.hostname.toLowerCase() == "anonymousmeerkat.github.io" &&
+        window.location.href.indexOf("anonymousmeerkat.github.io/inject2download/prefs.html") >= 0 &&
+        !did_prefs) {
+        run_on_load(function() {
+            var text = [
+                "<html><head><title>Inject2Download Preferences</title></head><body style='margin:0;padding:1em'>",
+                "<div style='width:100%'><h2>Inject2Download</h2></div>",
+                "<div id='prefs'></div>",
+                "<div id='save'><button id='savebtn'>Save</button><br /><span id='savetxt'></span></div>",
+                "</body></html>"
+            ].join("");
+            document.documentElement.innerHTML = text;
+
+            var prefs = document.getElementById("prefs");
+            prefs.appendChild(document.createElement("hr"));
+            for (var key in config_template) {
+                var template = config_template[key];
+
+                var prefdiv = document.createElement("div");
+                prefdiv.id = "pref-" + key;
+                prefdiv.style.paddingBottom = "1em";
+                var title = document.createElement("div");
+                title.style.paddingBottom = ".5em";
+                title.innerHTML = template.name;
+                prefdiv.appendChild(title);
+
+                if (typeof template.default === "boolean" ||
+                    "options" in template) {
+                    var options = template.options;
+                    if (typeof template.default === "boolean") {
+                        options = {
+                            "true": "Yes",
+                            "false": "No"
+                        };
+                    }
+
+                    for (var option in options) {
+                        var input = document.createElement("input");
+                        input.name = key;
+                        input.value = option;
+                        input.type = "radio";
+                        input.id = key + "-" + option;
+
+                        if (config[key].toString() === option)
+                            input.setAttribute("checked", true);
+
+                        var label = document.createElement("label");
+                        label.setAttribute("for", input.id);
+                        label.innerHTML = options[option];
+
+                        prefdiv.appendChild(input);
+                        prefdiv.appendChild(label);
+                        prefdiv.appendChild(document.createElement("br"));
+                    }
+                } else if (template.type === "textarea") {
+                    var input = document.createElement("textarea");
+                    input.name = key;
+                    input.style.width = "30em";
+                    input.style.height = "10em";
+                    input.innerHTML = config[key];
+
+                    prefdiv.appendChild(input);
+                } else {
+                    var input = document.createElement("input");
+                    input.name = key;
+                    input.value = config[key];
+                    input.style.width = "50em";
+
+                    prefdiv.appendChild(input);
+                }
+
+                prefs.appendChild(prefdiv);
+                prefs.appendChild(document.createElement("hr"));
+            }
+
+            document.getElementById("savebtn").onclick = function() {
+                for (var key in config_template) {
+                    var els = document.getElementsByName(key);
+                    var value = undefined;
+                    if (els.length > 1) {
+                        // radio
+                        for (var i = 0; i < els.length; i++) {
+                            if (els[i].checked) {
+                                value = els[i].value;
+                                if (value === "true")
+                                    value = true;
+                                if (value === "false")
+                                    value = false;
+                                break;
+                            }
+                        }
+                    } else {
+                        if (els[0].tagName === "INPUT") {
+                            value = els[0].value;
+                        } else if (els[0].tagName === "TEXTAREA") {
+                            value = els[0].value;
+                        }
+                    }
+                    console.log("[i2d] " + key + " = " + value);
+                    GM_setValue(key, value);
+                }
+                document.getElementById("savetxt").innerHTML = "Saved!";
+                setTimeout(function() {
+                    document.getElementById("savetxt").innerHTML = "";
+                }, 3000);
+            };
+
+            console.log("[i2d] Finished rendering preferences page");
+        });
+        did_prefs = true;
+    }
 
     // Helper functions
+    function run_on_load(f) {
+        if (document.readyState === "complete" ||
+            document.readyState === "interactive") {
+            f();
+        } else {
+            var listener = function() {
+                if (document.readyState === "complete" ||
+                    document.readyState === "interactive") {
+                    f();
+
+                    document.removeEventListener("readystatechange", listener);
+                }
+            };
+
+            document.addEventListener("readystatechange", listener);
+            //document.addEventListener('DOMContentLoaded', f, false);
+            //window.addEventListener('load', f, false);
+        }
+    }
+
     function i2d_show_url(namespace, url, description) {
         function get_absolute_url(url) {
             var a = document.createElement('a');
@@ -76,6 +274,7 @@
             var el = document.getElementById("i2d-popup");
             var elspan = document.getElementById("i2d-popup-x");
             var elspan1 = document.getElementById("i2d-popup-close");
+            var elspan2 = document.getElementById("i2d-popup-prefs");
             var eldiv = document.getElementById("i2d-popup-div");
             var eldivhold = document.getElementById("i2d-popup-div-holder");
             if (!el) {
@@ -136,6 +335,22 @@
                 elspan1.innerHTML = '[close]';
                 elspan1.style.textDecoration = "underline";
                 eldivhold.appendChild(elspan1);
+
+                elspan2 = document.createElement("a");
+                elspan2.style.all = "initial";
+                elspan2.style.fontSize = "130%";
+                elspan2.style.cursor = "pointer";
+                elspan2.style.color = "#900";
+                elspan2.style.padding = ".1em";
+                elspan2.style.float = "left";
+                //elspan1.style.display = "none";
+                elspan2.style.display = "inline";
+                elspan2.id = "i2d-popup-prefs";
+                elspan2.innerHTML = '[options]';
+                elspan2.href = "https://anonymousmeerkat.github.io/inject2download/prefs.html";
+                elspan2.setAttribute("target", "_blank");
+                elspan2.style.textDecoration = "underline";
+                eldivhold.appendChild(elspan2);
 
                 //el.innerHTML = "<br style='line-height:150%' />";
                 el.id = "i2d-popup";
@@ -384,7 +599,8 @@
                 break;
         }
 
-        add_script(i2d_show_url.toString() + "\n" + i2d_add_player.toString() + "\n" +
+        add_script("var config = " + JSON.stringify(config) + ";\n" +
+                   i2d_show_url.toString() + "\n" + i2d_add_player.toString() + "\n" +
                    initobjects + "\n" +
                    "if ((window." + variable + " !== undefined) && !(window." + variable + ".INJECTED)) {\n" +
                    "var oldvariable = window." + variable + ";\n" +
@@ -449,6 +665,10 @@
     }
 
 
+    if (blacklisted)
+        return;
+
+
     // Main code
     function i2d_main(e) {
         if (e) {
@@ -482,6 +702,7 @@
             });
         }
 
+        // TODO: Implement simple player
         if ("jwplayer" in window && !window.jwplayer.INJECTED) {
             inject("jwplayer", function() {
                 var result = oldvariable.apply(this, arguments);
@@ -549,6 +770,9 @@
 
                             check_sources(x);
                         }
+
+                        if (config.noads && "advertising" in arguments[0])
+                            delete arguments[0].advertising;
 
                         return old_jwplayer_setup.apply(this, arguments);
                     };
@@ -644,6 +868,10 @@
                     if (typeof x !== "object")
                         return;
 
+                    // test: https://flowplayer.com/docs/player/standalone/vast/overlay.html
+                    if (config.noads && "ima" in x)
+                        delete x.ima;
+
                     label = "";
 
                     if ("title" in x)
@@ -738,6 +966,11 @@
                     add_url("flowplayer", get_url(arguments[1]));
                 }
 
+                var isflash = false;
+                if (arguments.length >= 2 && typeof arguments[1] === "string" && arguments[1].toLowerCase().match(/\.swf$/)) {
+                    isflash = true;
+                }
+
                 for (var i = 0; i < els.length; i++) {
                     if (!els[i] || !(els[i] instanceof HTMLElement))
                         continue;
@@ -748,7 +981,8 @@
                     }
                 }
 
-                if (false) {
+                if (config.simpleplayers === "yes" ||
+                    (config.simpleplayers === "flash" && isflash)) {
                     oldvariable = function() {
                         var css = {width: "100%", height: "100%"};
                         for (var key in options.screen) {
@@ -1106,7 +1340,8 @@
                 }
 
                 // Replace flash with HTML5, but it doesn't work for HLS
-                if (false) {
+                if (config.simpleplayers === "yes" ||
+                    config.simpleplayers === "flash") {
                     var value = (new KollusMediaContainer(options));
                     var old_launchFlashPlayer = value.launchFlashPlayer;
                     value.launchFlashPlayer = function() {
