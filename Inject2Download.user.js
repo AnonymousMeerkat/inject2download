@@ -1,9 +1,7 @@
-// NOTE: This script now requires GM_setValue/getValue for storing preferences
-
 // ==UserScript==
 // @name         Inject2Download
 // @namespace    http://lkubuntu.wordpress.com/
-// @version      0.3.0
+// @version      0.3.1
 // @description  Simple media download script
 // @author       Anonymous Meerkat
 // @include      *
@@ -11,6 +9,8 @@
 // @grant        GM_setValue
 // @run-at       document-start
 // ==/UserScript==
+
+// NOTE: This script now requires GM_setValue/getValue for storing preferences
 
 (function() {
     "use strict";
