@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Inject2Download
 // @namespace    http://lkubuntu.wordpress.com/
-// @version      0.3.2.1
+// @version      0.3.3
 // @description  Simple media download script
 // @author       Anonymous Meerkat
 // @include      *
@@ -73,8 +73,9 @@
     for (var i = 0; i < blacklist.length; i++) {
         var normalized = blacklist[i].replace(/^ */, "").replace(/ *$/, "");
         if (host === normalized.toLowerCase() ||
-            host.indexOf("." + normalized) === (host.length - normalized.length - 1)) {
-            console.log("[i2d] Blacklisted");
+            (host.indexOf("." + normalized) >= 0 &&
+            host.indexOf("." + normalized) === (host.length - normalized.length - 1))) {
+            console.log("[i2d] Blacklisted: " + normalized);
             blacklisted = true;
             break;
         }
@@ -657,6 +658,12 @@
         })(window.XMLHttpRequest.prototype.open);
     }
 
+    function can_inject(name) {
+        if (name in window && (typeof window[name] === "object" || typeof window[name] === "function") && !window[name].INJECTED)
+            return true;
+        return false;
+    }
+
     function i2d_onload(f) {
         if (document.readyState === "loading") {
             document.addEventListener("DOMContentLoaded", f);
@@ -692,7 +699,7 @@
             };
         }
 
-        if ("soundManager" in window && !window.soundManager.INJECTED) {
+        if (can_inject("soundManager")) {
             inject("soundManager.createSound", function(arg1, arg2) {
                 if (typeof arg1 === "string")
                     i2d_show_url("soundManager", arg2);
@@ -704,7 +711,7 @@
         }
 
         // TODO: Implement simple player
-        if ("jwplayer" in window && !window.jwplayer.INJECTED) {
+        if (can_inject("jwplayer")) {
             inject("jwplayer", function() {
                 var result = oldvariable.apply(this, arguments);
 
@@ -805,7 +812,7 @@
             });
         }
 
-        if ("flowplayer" in window && !window.flowplayer.INJECTED) {
+        if (can_inject("flowplayer")) {
             inject("flowplayer", function() {
                 var obj_baseurl = null;
                 var els = [];
@@ -1106,7 +1113,7 @@
             }));
         }
 
-        if ("videojs" in window && !window.videojs.INJECTED) {
+        if (can_inject("videojs")) {
             inject("videojs", function() {
                 if (arguments.length > 0 && typeof arguments[0] === "string") {
                     var my_el = document.getElementById(arguments[0]);
@@ -1172,7 +1179,7 @@
                        }));
         }
 
-        if ("amp" in window && !window.amp.INJECTED) {
+        if (can_inject("amp")) {
             inject("amp", function() {
                 function show_amp_source(sourceobj) {
                     if ("protectionInfo" in sourceobj) {
@@ -1208,7 +1215,7 @@
             });
         }
 
-        if ("DJPlayer" in window && !window.DJPlayer.INJECTED) {
+        if (can_inject("DJPlayer")) {
             add_script(i2d_show_url.toString() + "\n" +
                        "var oldsetmedia = window.DJPlayer.prototype.setMedia;\n" +
                        "window.DJPlayer.prototype.setMedia = function() {\n" +
@@ -1219,7 +1226,7 @@
                        "}");
         }
 
-        if ("bitmovin" in window && !window.bitmovin.INJECTED) {
+        if (can_inject("bitmovin")) {
             inject(["bitmovin.player", "bitdash", "bitmovinPlayer"], function() {
                 var result = oldvariable.apply(this, arguments);
 
@@ -1283,7 +1290,7 @@
             });
         }
 
-        if ("dashjs" in window && window.dashjs.MediaPlayer && !window.dashjs.MediaPlayer.INJECTED) {
+        if ("dashjs" in window && window.dashjs && window.dashjs.MediaPlayer && !window.dashjs.MediaPlayer.INJECTED) {
             inject("dashjs.MediaPlayer", function() {
                 var outer_result = oldvariable.apply(this, arguments);
 
@@ -1304,7 +1311,7 @@
             });
         }
 
-        if ("Hls" in window && window.Hls && !window.Hls.INJECTED) {
+        if (can_inject("Hls")) {
             console.log("[i2d] injecting Hls");
             var old_loadsource = window.Hls.prototype.loadSource;
             window.Hls.prototype.loadSource = function(url) {
@@ -1314,7 +1321,7 @@
             window.Hls.INJECTED = true;
         }
 
-        if ("flvjs" in window && window.flvjs.createPlayer && !window.flvjs.createPlayer.INJECTED) {
+        if ("flvjs" in window && window.flvjs && window.flvjs.createPlayer && !window.flvjs.createPlayer.INJECTED) {
             inject("flvjs.createPlayer", function(options) {
                 if (options) {
                     if ("url" in options) {
@@ -1325,7 +1332,7 @@
             });
         }
 
-        if ("KollusMediaContainer" in window && window.KollusMediaContainer && !window.KollusMediaContainer.INJECTED) {
+        if (can_inject("KollusMediaContainer")) {
             inject("KollusMediaContainer.createInstance", function(options) {
                 if (options) {
                     if ("mediaurl" in options) {
