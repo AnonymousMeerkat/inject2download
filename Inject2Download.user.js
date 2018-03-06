@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Inject2Download
 // @namespace    http://lkubuntu.wordpress.com/
-// @version      0.3.2
+// @version      0.3.2.1
 // @description  Simple media download script
 // @author       Anonymous Meerkat
 // @include      *
@@ -247,7 +247,7 @@
         if (typeof url !== "string" || url.replace("\s", "").length === 0)
             return;
 
-        if (url.match(/^mediasource:/) || url.match(/^blob:/))
+        if (url.match(/^mediasource:/) || url.match(/^blob:/) || url.match(/^data:/))
             return;
 
         url = get_absolute_url(url);
