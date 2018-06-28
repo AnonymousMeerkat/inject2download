@@ -1,12 +1,15 @@
 // ==UserScript==
 // @name         Inject2Download
 // @namespace    http://lkubuntu.wordpress.com/
-// @version      0.3.3
+// @version      0.4.0
 // @description  Simple media download script
 // @author       Anonymous Meerkat
 // @include      *
 // @grant        GM_getValue
 // @grant        GM_setValue
+// @grant        GM.getValue
+// @grant        GM.setValue
+// @grant        none
 // @license      MIT License
 // @run-at       document-start
 // ==/UserScript==
@@ -19,8 +22,14 @@
     var injected_set = {};
     var did_prefs = false;
 
-    if (unsafeWindow)
-        window = unsafeWindow;
+    function get_window() {
+        var win = window;
+        if (typeof unsafeWindow !== "undefined")
+            win = unsafeWindow;
+        return win;
+    }
+
+    var win = get_window();
 
     // Most of these are disabled by default in order to avoid modifying the user experience in unexpected ways
     var config_template = {
@@ -61,24 +70,64 @@
                 },
                 function () {}
             );
-        })(key);*/
-        var data = GM_getValue(key);
-        if (data !== undefined)
-            config[key] = data;
+            })(key);*/
+
+
+        // Having both work as callbacks is possible, but introduces delay
+        // in cases where it's not necessary
+        if (typeof GM_getValue !== "undefined") {
+            var data = GM_getValue(key);
+            if (data !== undefined)
+                config[key] = data;
+        } else if (typeof GM !== "undefined" && GM.getValue) {
+            GM.getValue(key).then(function (data) {
+                if (data !== undefined) {
+                    config[key] = data;
+                }
+            }, function() {});
+        }
     }
 
-    var blacklist = config.blacklist.split("\n");
-    var blacklisted = false;
-    var host = window.location.hostname.toLowerCase();
-    for (var i = 0; i < blacklist.length; i++) {
-        var normalized = blacklist[i].replace(/^ */, "").replace(/ *$/, "");
-        if (host === normalized.toLowerCase() ||
-            (host.indexOf("." + normalized) >= 0 &&
-            host.indexOf("." + normalized) === (host.length - normalized.length - 1))) {
-            console.log("[i2d] Blacklisted: " + normalized);
-            blacklisted = true;
-            break;
+    function check_host(host) {
+        var ourhost = window.location.hostname.toLowerCase();
+        host = host.replace(/^ */, "").replace(/ *$/, "");
+        if (ourhost === host.toLowerCase() ||
+            (ourhost.indexOf("." + host) >= 0 &&
+             ourhost.indexOf("." + host) === (ourhost.length - host.length - 1))) {
+            return true;
         }
+
+        return false;
+    }
+
+    function normalize_url(url) {
+        if (!url)
+            return url;
+
+        return url.replace(/^[a-z]+:\/\//, "//");
+    }
+
+    function check_similar_url(url1, url2) {
+        return normalize_url(url1) === normalize_url(url2);
+    }
+
+    var blacklisted = false;
+    var verified_blacklisted = false;
+    function check_blacklisted() {
+        var blacklist = config.blacklist.split("\n");
+        blacklisted = false;
+        var host = window.location.hostname.toLowerCase();
+        for (var i = 0; i < blacklist.length; i++) {
+            var normalized = blacklist[i].replace(/^ */, "").replace(/ *$/, "");
+            if (host === normalized.toLowerCase() ||
+                (host.indexOf("." + normalized) >= 0 &&
+                 host.indexOf("." + normalized) === (host.length - normalized.length - 1))) {
+                console.log("[i2d] Blacklisted: " + normalized);
+                blacklisted = true;
+                break;
+            }
+        }
+        return blacklisted;
     }
 
     // Preferences
@@ -181,7 +230,11 @@
                         }
                     }
                     console.log("[i2d] " + key + " = " + value);
-                    GM_setValue(key, value);
+
+                    if (typeof GM_setValue !== "undefined")
+                        GM_setValue(key, value);
+                    else if (typeof GM !== "undefined" && GM.setValue)
+                        GM.setValue(key, value);
                 }
                 document.getElementById("savetxt").innerHTML = "Saved!";
                 setTimeout(function() {
@@ -215,7 +268,17 @@
         }
     }
 
+    var i2d_url_list = [];
     function i2d_show_url(namespace, url, description) {
+        if (!blacklisted && !verified_blacklisted) {
+            if (check_blacklisted()) {
+                verified_blacklisted = true;
+            }
+        }
+
+        if (blacklisted)
+            return;
+
         function get_absolute_url(url) {
             var a = document.createElement('a');
             a.href = url;
@@ -252,9 +315,6 @@
             return;
 
         url = get_absolute_url(url);
-
-        if (!("i2d_url_list" in window))
-            window.i2d_url_list = [];
 
         for (var i = 0; i < i2d_url_list.length; i++) {
             if (i2d_url_list[i][0] === namespace &&
@@ -489,6 +549,9 @@
             return ret.add_urls(urls);
         };
         var getext = function(url) {
+            if (!url)
+                return url;
+
             return url.replace(/.*\.([^/.?]*)(?:\?.*)?$/, "$1").toLowerCase();
         };
         var loadscript = function(variable, url, cb) {
@@ -502,7 +565,7 @@
             }
         };
         ret.set_url = function(url) {
-            if (!url)
+            if (!url || typeof url !== "string")
                 return;
             switch(getext(url)) {
                 case "flv":
@@ -639,23 +702,57 @@
         inject("jQuery.fn." + name, value);
     }
 
-    function inject_url(pattern, func) {
-        // https://stackoverflow.com/questions/629671/how-can-i-intercept-xmlhttprequests-from-a-greasemonkey-script
-        console.log("[i2d] injecting URL: " + pattern);
-        (function(open) {
-            window.XMLHttpRequest.prototype.open = function() {
-                if (arguments[1] &&
-                    arguments[1].match(pattern)) {
-                    var url = arguments[1];
+    var injected_urls = [];
+
+    (function(open) {
+        window.XMLHttpRequest.prototype.open = function() {
+            if (arguments[1]) {
+                var src = arguments[1];
+
+                var url = null;
+                for (var i = 0; i < injected_urls.length; i++) {
+                    if (injected_urls[i].url &&
+                        check_similar_url(injected_urls[i].url, src)) {
+                        url = injected_urls[i];
+                        break;
+                    }
+
+                    if (injected_urls[i].pattern &&
+                        src.match(injected_urls[i].pattern)) {
+                        url = injected_urls[i];
+                        break;
+                    }
+                }
+
+                if (url) {
                     this.addEventListener("readystatechange", function() {
                         if (this.readyState === 4) {
-                            func.bind(this)(url);
+                            url.func.bind(this)(src);
                         }
                     });
                 }
-                open.apply(this, arguments);
-            };
-        })(window.XMLHttpRequest.prototype.open);
+            }
+
+            open.apply(this, arguments);
+        };
+    })(window.XMLHttpRequest.prototype.open);
+
+    function inject_url(pattern, func) {
+        var obj = {func: func};
+
+        if (pattern instanceof RegExp) {
+            obj.pattern = pattern;
+        } else {
+            obj.url = pattern;
+        }
+
+        for (var i = 0; i < injected_urls.length; i++) {
+            if (injected_urls[i].url === obj.url ||
+                injected_urls[i].pattern === obj.pattern)
+                return;
+        }
+
+        injected_urls.push(obj);
     }
 
     function can_inject(name) {
@@ -677,45 +774,36 @@
         return;
 
 
-    // Main code
-    function i2d_main(e) {
-        if (e) {
-            if (!e.tagName || e.tagName.toLowerCase() !== "script")
-                return;
-            if ((e.className === "i2d")) {
-                return;
-            }
+    var injections = [
+        // soundManager
+        {
+            variables: {
+                window: "soundManager.createSound"
+            },
+            replace: function(context, args) {
+                var arg1 = args[0];
+                var arg2 = args[1];
 
-            /*var ourscript = document.createElement("script");
-            ourscript.className = "i2d";
-            ourscript.innerHTML = "i2d_main();" + i2d_main;
-            e.parentElement.insertBefore(ourscript, e.nextSibling);*/
-
-            var old_onload = e.onload;
-            e.onload = function() {
-                i2d_main();
-                if (old_onload)
-                    return old_onload.apply(this, arguments);
-            };
-        }
-
-        if (can_inject("soundManager")) {
-            inject("soundManager.createSound", function(arg1, arg2) {
                 if (typeof arg1 === "string")
                     i2d_show_url("soundManager", arg2);
                 else
                     i2d_show_url("soundManager", arg1.url);
 
-                return oldvariable.apply(this, arguments);
-            });
-        }
+                return context.oldvariable.apply(this, args);
+            }
+        },
+        // jwplayer
+        {
+            variables: {
+                window: "jwplayer"
+            },
+            replace: function(context, args) {
+                var result = context.oldvariable.apply(this, args);
 
-        // TODO: Implement simple player
-        if (can_inject("jwplayer")) {
-            inject("jwplayer", function() {
-                var result = oldvariable.apply(this, arguments);
+                var check_sources = function(x, options) {
+                    if (!options)
+                        options = {};
 
-                var check_sources = function(x) {
                     if (typeof x === "object") {
                         if (x instanceof Array) {
                             for (var i = 0; i < x.length; i++) {
@@ -748,14 +836,20 @@
                         }
 
                         if ("playlist" in x) {
-                            check_sources(x.playlist);
+                            check_sources(x.playlist, {playlist: true});
                         }
 
                         if ("tracks" in x) {
-                            check_sources(x.tracks);
+                            check_sources(x.tracks, {playlist: true});
                         }
                     } else if (typeof x === "string") {
                         i2d_show_url("jwplayer", x);
+
+                        if (options.playlist) {
+                            inject_url(x, function() {
+                                check_sources(JSON.parse(this.responseText), {playlist: true});
+                            });
+                        }
                     }
                 };
 
@@ -809,11 +903,14 @@
                 }
 
                 return result;
-            });
-        }
-
-        if (can_inject("flowplayer")) {
-            inject("flowplayer", function() {
+            }
+        },
+        // flowplayer
+        {
+            variables: {
+                window: ["flowplayer", "$f"]
+            },
+            replace: function(context, args) {
                 var obj_baseurl = null;
                 var els = [];
 
@@ -829,7 +926,7 @@
                         }
                     }
 
-                    return i2d_show_url.apply(this, arguments);
+                    return i2d_show_url.apply(this, args);
                 };
                 var add_url_pair = function(el) {
                     var newargs = Array.prototype.slice.call(arguments, 1);
@@ -932,23 +1029,23 @@
                     }
                 }
 
-                if (arguments.length >= 1) {
+                if (args.length >= 1) {
                     els = [null];
 
-                    if (typeof arguments[0] === "string") {
+                    if (typeof args[0] === "string") {
                         try {
-                            els[0] = document.getElementById(arguments[0]);
+                            els[0] = document.getElementById(args[0]);
                         } catch(e) {
                         }
 
                         try {
                             if (!els[0])
-                                els = document.querySelectorAll(arguments[0]);
+                                els = document.querySelectorAll(args[0]);
                         } catch(e) {
                             els = [];
                         }
-                    } else if (arguments[0] instanceof HTMLElement) {
-                        els = [arguments[0]];
+                    } else if (args[0] instanceof HTMLElement) {
+                        els = [args[0]];
                     }
                 }
 
@@ -962,20 +1059,20 @@
 
                 var options = {};
 
-                if (arguments.length >= 3 && typeof arguments[2] === "object") {
-                    check_sources(arguments[2], els);
-                    options = arguments[2];
-                } else if (arguments.length >= 3 && typeof arguments[2] === "string") {
-                    add_url("flowplayer", get_url(arguments[2]));
-                } else if (arguments.length === 2 && typeof arguments[1] === "object") {
-                    check_sources(arguments[1], els);
-                    options = arguments[1];
-                } else if (arguments.length === 2 && typeof arguments[1] === "string") {
-                    add_url("flowplayer", get_url(arguments[1]));
+                if (args.length >= 3 && typeof args[2] === "object") {
+                    check_sources(args[2], els);
+                    options = args[2];
+                } else if (args.length >= 3 && typeof args[2] === "string") {
+                    add_url("flowplayer", get_url(args[2]));
+                } else if (args.length === 2 && typeof args[1] === "object") {
+                    check_sources(args[1], els);
+                    options = args[1];
+                } else if (args.length === 2 && typeof args[1] === "string") {
+                    add_url("flowplayer", get_url(args[1]));
                 }
 
                 var isflash = false;
-                if (arguments.length >= 2 && typeof arguments[1] === "string" && arguments[1].toLowerCase().match(/\.swf$/)) {
+                if (args.length >= 2 && typeof args[1] === "string" && args[1].toLowerCase().match(/\.swf$/)) {
                     isflash = true;
                 }
 
@@ -989,6 +1086,7 @@
                     }
                 }
 
+                var oldvariable = context.oldvariable;
                 if (config.simpleplayers === "yes" ||
                     (config.simpleplayers === "flash" && isflash)) {
                     oldvariable = function() {
@@ -996,21 +1094,21 @@
                         for (var key in options.screen) {
                             var val = options.screen[key];
                             switch(key) {
-                                case "height":
-                                case "width":
-                                case "bottom":
-                                case "top":
-                                case "left":
-                                case "right":
-                                    if (typeof val === "number") {
-                                        css[key] = val + "px";
-                                    } else {
-                                        css[key] = val;
-                                    }
-                                    break;
-                                default:
+                            case "height":
+                            case "width":
+                            case "bottom":
+                            case "top":
+                            case "left":
+                            case "right":
+                                if (typeof val === "number") {
+                                    css[key] = val + "px";
+                                } else {
                                     css[key] = val;
-                                    break;
+                                }
+                                break;
+                            default:
+                                css[key] = val;
+                                break;
                             }
                         }
                         for (var i = 0; i < els.length; i++) {
@@ -1028,7 +1126,7 @@
 
                         var allp = function(name) {
                             for (var key in players) {
-                                players[key][name].apply(this, Array.prototype.slice.apply(arguments, 1));
+                                players[key][name].apply(this, Array.prototype.slice.apply(args, 1));
                             }
                         };
 
@@ -1049,7 +1147,7 @@
                     };
                 }
 
-                var result = oldvariable.apply(this, arguments);
+                var result = oldvariable.apply(this, args);
 
                 if (!result || typeof result !== "object")
                     return result;
@@ -1095,30 +1193,43 @@
                 }
 
                 /*if ("on" in result) {
-                    result.on("load", function(e, api, video) {
-                        console.log(e);
-                        check_sources(video || api.video, els);
-                    });
-                }*/
+                  result.on("load", function(e, api, video) {
+                  console.log(e);
+                  check_sources(video || api.video, els);
+                  });
+                  }*/
 
                 return result;
-            }, ["$f"]);
-
-            add_script(get_script_str(function() {
-                flowplayer(function(api, root) {
+            },
+            after_inject: function(context) {
+                context.win.flowplayer(function(api, root) {
                     api.on("load", function(e, api, video) {
-                        flowplayer().load(video || api.video);
+                        context.win.flowplayer().load(video || api.video);
                     });
                 });
-            }));
-        }
-
-        if (can_inject("videojs")) {
-            inject("videojs", function() {
-                if (arguments.length > 0 && typeof arguments[0] === "string") {
-                    var my_el = document.getElementById(arguments[0]);
+            }
+        },
+        // flowplayer (jQuery)
+        {
+            variables: {
+                jquery: "flowplayer"
+            },
+            replace: function(context, args) {
+                var newargs = Array.from(args);
+                newargs.unshift(jQuery(this)[0]);
+                return context.win.flowplayer.apply(this, newargs);
+            }
+        },
+        // video.js
+        {
+            variables: {
+                window: "videojs"
+            },
+            replace: function(context, args) {
+                if (args.length > 0 && typeof args[0] === "string") {
+                    var my_el = document.getElementById(args[0]);
                     if (!my_el)
-                        my_el = document.querySelector(arguments[0]);
+                        my_el = document.querySelector(args[0]);
 
                     if (my_el) {
                         if (my_el.src) {
@@ -1135,7 +1246,7 @@
                     }
                 }
 
-                var result = oldvariable.apply(this, arguments);
+                var result = context.oldvariable.apply(this, args);
 
                 var old_videojs_src = result.src;
                 result.src = function() {
@@ -1149,38 +1260,14 @@
                 };
 
                 return result;
-            });
-
-            add_script(i2d_show_url.toString() +
-                       i2d_onload.toString() +
-                       get_script_str(function() {
-                            i2d_onload(function() {
-                                var els = document.getElementsByClassName("video-js");
-                                for (var i = 0; i < els.length; i++) {
-                                    var my_el = els[i];
-                                    if (my_el.tagName.toLowerCase() === "video") {
-                                        if (!my_el.getAttribute('data-setup')) {
-                                            continue;
-                                        }
-                                        if (my_el.src) {
-                                           i2d_show_url("videojs", my_el.src);
-                                        }
-
-                                        for (var j = 0; j < my_el.children.length; j++) {
-                                            if (my_el.children[j].tagName.toLowerCase() === "source") {
-                                                if (my_el.children[j].src) {
-                                                    i2d_show_url("videojs", my_el.children[j].src, my_el.children[j].getAttribute("label"));
-                                                }
-                                            }
-                                        }
-                                    }
-                                }
-                            });
-                       }));
-        }
-
-        if (can_inject("amp")) {
-            inject("amp", function() {
+            }
+        },
+        // amp
+        {
+            variables: {
+                window: "amp"
+            },
+            replace: function(context, args) {
                 function show_amp_source(sourceobj) {
                     if ("protectionInfo" in sourceobj) {
                         console.log("[amp] Cannot decode protection info");
@@ -1189,46 +1276,53 @@
                        i2d_show_url("amp", sourceobj.src);
                 }
 
-                if (arguments.length >= 2 && typeof arguments[1] === "object") {
-                    if ("sourceList" in arguments[1]) {
-                        for (var i = 0; i < arguments[1].sourceList.length; i++) {
-                            show_amp_source(arguments[1].sourceList[i]);
+                if (args.length >= 2 && typeof args[1] === "object") {
+                    if ("sourceList" in args[1]) {
+                        for (var i = 0; i < args[1].sourceList.length; i++) {
+                            show_amp_source(args[1].sourceList[i]);
                         }
                     }
                 }
 
-                var result = oldvariable.apply(this, arguments);
+                var result = context.oldvariable.apply(this, args);
 
                 if (!result)
                     return result;
 
                 var old_amp_src = result.src;
                 result.src = function() {
-                    for (var i = 0; i < arguments[0].length; i++) {
-                        show_amp_source(arguments[0][i]);
+                    for (var i = 0; i < args[0].length; i++) {
+                        show_amp_source(args[0][i]);
                     }
 
-                    return old_amp_src.apply(this, arguments);
+                    return old_amp_src.apply(this, args);
                 };
 
                 return result;
-            });
-        }
+            }
+        },
+        // DJPlayer
+        {
+            variables: {
+                window: "DJPlayer"
+            },
+            proto: {
+                setMedia: function(context, args) {
+                    if (args.length > 0 && typeof args[0] === 'string') {
+                        i2d_show_url('DJPlayer', args[0]);
+                    }
 
-        if (can_inject("DJPlayer")) {
-            add_script(i2d_show_url.toString() + "\n" +
-                       "var oldsetmedia = window.DJPlayer.prototype.setMedia;\n" +
-                       "window.DJPlayer.prototype.setMedia = function() {\n" +
-                       "  if (arguments.length > 0 && typeof arguments[0] === 'string') {\n" +
-                       "    i2d_show_url('DJPlayer', arguments[0]);\n" +
-                       "  }\n" +
-                       "  return oldsetmedia.apply(this, arguments);\n" +
-                       "}");
-        }
-
-        if (can_inject("bitmovin")) {
-            inject(["bitmovin.player", "bitdash", "bitmovinPlayer"], function() {
-                var result = oldvariable.apply(this, arguments);
+                    return context.oldvariable.apply(this, args);
+                }
+            }
+        },
+        // Bitmovin
+        {
+            variables: {
+                window: ["bitmovin.player", "bitdash", "bitmovinPlayer"]
+            },
+            replace: function(context, args) {
+                var result = context.oldvariable.apply(this, args);
 
                 var check_progressive = function(progressive) {
                     if (typeof progressive === "string") {
@@ -1287,12 +1381,15 @@
                 }
 
                 return result;
-            });
-        }
-
-        if ("dashjs" in window && window.dashjs && window.dashjs.MediaPlayer && !window.dashjs.MediaPlayer.INJECTED) {
-            inject("dashjs.MediaPlayer", function() {
-                var outer_result = oldvariable.apply(this, arguments);
+            }
+        },
+        // DASH.js
+        {
+            variables: {
+                window: "dashjs.MediaPlayer"
+            },
+            replace: function(context, args) {
+                var outer_result = context.oldvariable.apply(this, args);
 
                 var oldcreate = outer_result.create;
                 outer_result.create = function() {
@@ -1308,32 +1405,44 @@
                 };
 
                 return outer_result;
-            });
-        }
-
-        if (can_inject("Hls")) {
-            console.log("[i2d] injecting Hls");
-            var old_loadsource = window.Hls.prototype.loadSource;
-            window.Hls.prototype.loadSource = function(url) {
-                i2d_show_url("hls.js", url);
-                return old_loadsource.apply(this, arguments);
-            };
-            window.Hls.INJECTED = true;
-        }
-
-        if ("flvjs" in window && window.flvjs && window.flvjs.createPlayer && !window.flvjs.createPlayer.INJECTED) {
-            inject("flvjs.createPlayer", function(options) {
+            }
+        },
+        // hls.js
+        {
+            variables: {
+                window: "Hls"
+            },
+            proto: {
+                loadSource: function(context, args) {
+                    var url = args[0];
+                    i2d_show_url("hls.js", url);
+                    return context.oldvariable.apply(this, args);
+                }
+            }
+        },
+        // flv.js
+        {
+            variables: {
+                window: "flvjs.createPlayer"
+            },
+            replace: function(context, args) {
+                var options = args[0];
                 if (options) {
                     if ("url" in options) {
                         i2d_show_url("flv.js", options.url);
                     }
                 }
-                return oldvariable.apply(this, arguments);
-            });
-        }
+                return context.oldvariable.apply(this, args);
+            }
+        },
+        // Kollus
+        {
+            variables: {
+                window: "KollusMediaContainer.createInstance"
+            },
+            replace: function(context, args) {
+                var options = args[0];
 
-        if (can_inject("KollusMediaContainer")) {
-            inject("KollusMediaContainer.createInstance", function(options) {
                 if (options) {
                     if ("mediaurl" in options) {
                         var types = [];
@@ -1366,36 +1475,54 @@
 
                     return value;
                 } else {
-                    return oldvariable.apply(this, arguments);
+                    return context.oldvariable.apply(this, args);
                 }
-            });
-        }
-
-        if (("location" in window) && window.location && window.location.host.search("soundcloud.com") >= 0 && !("soundcloud" in injected_set)) {
-            injected_set["soundcloud"] = true;
-
-            inject_url(/api\.soundcloud\.com\/.*?\/tracks\/[0-9]*\/streams/, function(url) {
-                var track = url.match(/\/tracks\/([0-9]*)\//);
-                var parsed = JSON.parse(this.responseText);
-                for (var item in parsed) {
-                    i2d_show_url("soundcloud", parsed[item], "[" + item + "] " + track[1]);
+            }
+        },
+        // Soundcloud
+        {
+            run_when: [{
+                host: "soundcloud.com"
+            }],
+            urls: [
+                {
+                    regex: /api\.soundcloud\.com\/.*?\/tracks\/[0-9]*\/streams/,
+                    callback: function(url) {
+                        var track = url.match(/\/tracks\/([0-9]*)\//);
+                        var parsed = JSON.parse(this.responseText);
+                        for (var item in parsed) {
+                            i2d_show_url("soundcloud", parsed[item], "[" + item + "] " + track[1]);
+                        }
+                    }
                 }
-            });
-        }
+            ]
+        },
+        // Forvo
+        {
+            run_when: [{
+                host: "forvo.com"
+            }],
+            variables: {
+                window: "createAudioObject"
+            },
+            replace: function(context, args) {
+                var id = args[0];
+                var mp3 = args[1];
+                var ogg = args[2];
 
-        if (("location" in window) && window.location && window.location.host.search("forvo") >= 0 && "createAudioObject" in window && !window.createAudioObject.INJECTED) {
-            inject("createAudioObject", function(id, mp3, ogg) {
                 i2d_show_url("forvo", mp3, "mp3");
                 i2d_show_url("forvo", ogg, "ogg");
 
-                return oldvariable.apply(this, arguments);
-            });
-        }
-
-        if (("location" in window) && window.location && window.location.href.search("twitter.com/i/videos") >= 0 && !("twitter" in injected_set)) {
-            injected_set["twitter"] = true;
-
-            i2d_onload(function() {
+                return context.oldvariable.apply(this, args);
+            }
+        },
+        // Twitter
+        {
+            run_when: [{
+                host: "twitter.com",
+                url_regex: /:\/\/[^/]*\/i\/videos/
+            }],
+            onload: function() {
                 var pc = document.getElementById('playerContainer');
                 if (!pc) {
                     return;
@@ -1411,80 +1538,20 @@
                 if ("video_url" in config_parsed) {
                     i2d_show_url('twitter', config_parsed.video_url);
                 }
-            });
-        }
-
-        if (("location" in window) && window.location && window.location.href.search("vine.co/v/") >= 0) {
-            var show_video_urls = function(videourls) {
-                for (var i = 0; i < videourls.length; i++) {
-                    var videourl = videourls[i];
-
-                    var formatstr = "[";
-                    formatstr += videourl.format + ":";
-                    formatstr += videourl.idStr;
-
-                    if (videourl.rate > 0)
-                        formatstr += ", " + videourl.rate;
-
-                    formatstr += "]";
-
-                    i2d_show_url('vine', videourl.videoUrl, formatstr);
-                }
-            };
-
-            if (window.location.href.search("/card" ) >= 0 && !("vine_card" in injected_set)) {
-                injected_set["vine_card"] = true;
-
-                i2d_onload(function() {
-                    var config_el = document.getElementById("configuration");
-                    if (!config_el) {
-                        return;
-                    }
-
-                    var config = JSON.parse(config_el.innerHTML);
-                    if (!config || typeof config !== "object") {
-                        return;
-                    }
-
-                    if (!("post" in config) || !("videoUrls" in config.post)) {
-                        return;
-                    }
-
-                    show_video_urls(config.post.videoUrls);
-                });
-            } else if (!("vine_video" in injected_set)) {
-                injected_set["vine_video"] = true;
-
-                i2d_onload(function() {
-                    var scripts = document.getElementsByTagName("script");
-                    if (scripts.length === 0)
-                        return;
-
-                    var thescript = null;
-                    for (var i = 0; i < scripts.length; i++) {
-                        if (scripts[i].innerHTML.search("window.POST_DATA") < 0) {
-                            continue;
-                        }
-
-                        thescript = scripts[i];
-                        break;
-                    }
-
-                    var config;
-                    eval(thescript.innerHTML.replace("window.POST_DATA", "config"));
-
-                    var videourls = config[Object.keys(config)[0]].videoUrls;
-                    show_video_urls(videourls);
-                });
             }
-        }
+        },
+        // TODO: Reimplement vine
 
-        if ("jQuery" in window) {
-            inject_jquery_plugin("jPlayer", function() {
-                if (arguments.length > 0 && arguments[0] === "setMedia") {
-                    if (arguments.length > 1) {
-                        if (typeof arguments[1] === "object") {
-                            for (var i in arguments[1]) {
+        // jPlayer
+        {
+            variables: {
+                jquery: "jPlayer"
+            },
+            replace: function(context, args) {
+                if (args.length > 0 && args[0] === "setMedia") {
+                    if (args.length > 1) {
+                        if (typeof args[1] === "object") {
+                            for (var i in args[1]) {
                                 if (i === "title" ||
                                     i === "duration" ||
                                     i === "track" /* for now */ ||
@@ -1492,19 +1559,24 @@
                                     i === "free")
                                     continue;
 
-                                i2d_show_url("jPlayer", arguments[1][i], i);
+                                i2d_show_url("jPlayer", args[1][i], i);
                             }
-                        } else if (typeof arguments[1] === "string") {
-                            i2d_show_url("jPlayer", arguments[1]);
+                        } else if (typeof args[1] === "string") {
+                            i2d_show_url("jPlayer", args[1]);
                         }
                     }
                 }
 
-                return oldvariable.apply(this, arguments);
-            });
-
-            inject_jquery_plugin("amazingaudioplayer", function() {
-                var result = oldvariable.apply(this, arguments);
+                return context.oldvariable.apply(this, args);
+            }
+        },
+        // amazingaudioplayer
+        {
+            variables: {
+                jquery: "amazingaudioplayer"
+            },
+            replace: function(context, args) {
+                var result = context.oldvariable.apply(this, args);
 
                 function add_source_obj(x) {
                     type = "";
@@ -1540,53 +1612,241 @@
                 };
 
                 return result;
-            });
+            }
+        },
+        // jPlayer{Audio,Video}
+        {
+            variables: {
+                jquery: ["jPlayerAudio", "jPlayerVideo"]
+            },
+            proto: {
+                setMedia: function(context, args) {
+                    var e = args[0];
+                    var label = "cleanaudioplayer";
+                    if (oldvariablename === "jPlayerVideo")
+                        label = "cleanvideoplayer";
 
-            if (jquery_plugin_exists("jPlayerAudio") && !window.jQuery.fn.jPlayerAudio.INJECTED) {
-                inject_jquery_plugin("jPlayerAudio", function() {
-                    return oldvariable.apply(this, arguments);
-                });
+                    var absolute = this._absoluteMediaUrls(e);
+                    jQuery.each(this.formats, function(a, o) {
+                        i2d_show_url(label, absolute[o]);
+                    });
+                    return context.oldvariable.apply(this, args);
+                }
+            }
+        }
+    ];
 
-                add_script(i2d_show_url.toString() + "\n" +
-                           "var oldmedia=jQuery.jPlayerAudio.prototype.setMedia;\n" +
-                           "jQuery.jPlayerAudio.prototype.setMedia = function(e) {\n" +
-                           "  var absolute = this._absoluteMediaUrls(e);\n" +
-                           "  jQuery.each(this.formats, function(a, o) {\n" +
-                           "    i2d_show_url('cleanaudioplayer', absolute[o]);\n" +
-                           "  });\n" +
-                           "  return oldmedia.apply(this, arguments);\n" +
-                           "}");
+    var props = {};
+
+    function defineprop(lastobj_win, lastobj_props, oursplit) {
+        if (!lastobj_win || !lastobj_props) {
+            console.log("lastobj_win === null || lastobj_props === null");
+            return;
+        }
+
+        if (!(oursplit in lastobj_props)) {
+            console.log(oursplit + " not in lastobj_props");
+            return;
+        }
+
+        var our_obj = lastobj_win[oursplit] || undefined;
+        var our_prop = lastobj_props[oursplit];
+
+        var recurse = function() {
+            for (var key in our_prop) {
+                if (!key.match(/^\$\$[A-Z]+$/)) {
+                    defineprop(our_obj, our_prop, key);
+                }
+            }
+        };
+
+        if (!our_prop.$$INJECTED) {
+            if (our_obj !== undefined) {
+                if (our_prop.$$PROCESS) {
+                    lastobj_win[oursplit] = our_prop.$$PROCESS(our_obj);
+                    our_obj = lastobj_win[oursplit];
+                }
+
+                recurse();
             }
 
-            if (jquery_plugin_exists("jPlayerVideo") && !window.jQuery.fn.jPlayerVideo.INJECTED) {
-                inject_jquery_plugin("jPlayerVideo", function() {
-                    return oldvariable.apply(this, arguments);
+            try {
+                Object.defineProperty(lastobj_win, oursplit, {
+                    get: function() {
+                        return our_obj;
+                    },
+                    set: function(n) {
+                        if (n === our_obj)
+                            return;
+
+                        //console.log(oursplit + " = ", n);
+
+                        if (our_prop.$$PROCESS)
+                            our_obj = our_prop.$$PROCESS(n);
+                        else
+                            our_obj = n;
+
+                        recurse();
+                    }
                 });
-
-                add_script(i2d_show_url.toString() + "\n" +
-                           "var oldmedia=jQuery.jPlayerVideo.prototype.setMedia;\n" +
-                           "jQuery.jPlayerVideo.prototype.setMedia = function(e) {\n" +
-                           "  var absolute = this._absoluteMediaUrls(e);\n" +
-                           "  jQuery.each(this.formats, function(a, o) {\n" +
-                           "    i2d_show_url('cleanvideoplayer', absolute[o]);\n" +
-                           "  });\n" +
-                           "  return oldmedia.apply(this, arguments);\n" +
-                           "}");
+                our_prop.$$INJECTED = true;
+            } catch (e) {
+                console.error(e);
             }
-
-            inject_jquery_plugin("flowplayer", function() {
-                var newargs = Array.from(arguments);
-                newargs.unshift(jQuery(this)[0]);
-                return window.flowplayer.apply(this, newargs);
-            });
         }
     }
 
-    i2d_main();
+    function apply_injection(injection, variable, variablename, win) {
+        console.log("[i2d] Injecting " + variablename);
 
-    window.addEventListener("afterscriptexecute", function(e) {
+        if ("replace" in injection) {
+            var context = {
+                oldvariable: variable,
+                oldvariablename: variablename,
+                win: win
+            };
+
+            return function() {
+                return injection.replace.bind(this)(context, arguments);
+            };
+        } else if ("proto" in injection) {
+            for (var proto in injection.proto) {
+                (function(proto) {
+                    var context = {
+                        oldvariable: variable.prototype.proto,
+                        oldvariablename: proto,
+                        win: win
+                    };
+
+                    variable.prototype[proto] = function() {
+                        return injection.proto[proto].bind(this)(context, arguments);
+                    };
+                })(proto);
+            }
+        }
+
+        return oldvariable;
+    }
+
+    function do_injection(injection) {
+        if ("run_when" in injection) {
+            var run_when = injection.run_when;
+            if (!(run_when instanceof Array)) {
+                run_when = [run_when];
+            }
+
+            for (var i = 0; i < run_when.length; i++) {
+                if ("host" in run_when[i]) {
+                    if (!check_host(run_when[i].host))
+                        return false;
+                }
+
+                if ("url_regex" in run_when[i]) {
+                    if (!window.location.href.match(run_when[i].url_regex))
+                        return false;
+                }
+            }
+        }
+
+        var win = get_window();
+
+        function do_window_injection(winvar) {
+            if (!(winvar instanceof Array))
+                winvar = [winvar];
+
+            for (var i = 0; i < winvar.length; i++) {
+                (function() {
+                    var varname = winvar[i];
+                    var dotsplit = varname.split(".");
+                    var lastobj = win;
+
+                    var process = function(v) {
+                        return apply_injection(injection, v, dotsplit[dotsplit.length - 1], win);
+                    };
+
+                    var lastprop = props;
+                    for (var x = 0; x < dotsplit.length; x++) {
+                        var oursplit = dotsplit[x];
+                        if (!lastprop[oursplit])
+                            lastprop[oursplit] = {};
+
+                        lastprop[oursplit].$$INJECTED = false;
+
+                        if (x === dotsplit.length - 1) {
+                            lastprop[oursplit].$$PROCESS = process;
+                        }
+
+                        lastprop = lastprop[oursplit];
+                    }
+
+                    /*defineprop(lastobj, dotsplit, 0, function(v) {
+                      return apply_injection(injection, v, dotsplit[dotsplit.length - 1], win);
+                      });*/
+                })();
+            }
+        }
+
+        if ("variables" in injection) {
+            if ("window" in injection.variables) {
+                var winvar = injection.variables.window;
+
+                do_window_injection(winvar);
+
+                /*if (!(winvar instanceof Array))
+                    winvar = [winvar];
+
+                for (var i = 0; i < winvar.length; i++) {
+                    var varname = winvar[i];
+                    var dotsplit = varname.split(".");
+                    var lastobj = win;
+
+                    defineprop(lastobj, dotsplit, 0, function(v) {
+                        return apply_injection(injection, v, dotsplit[dotsplit.length - 1], win);
+                    });
+                }*/
+            }
+
+            if ("jquery" in injection.variables) {
+                var jqvar = injection.variables.jquery;
+                if (!(jqvar instanceof Array))
+                    jqvar = [jqvar];
+
+                var winvar = [];
+                for (var i = 0; i < jqvar.length; i++) {
+                    winvar.push("jQuery.fn." + jqvar[i]);
+                }
+
+                do_window_injection(winvar);
+            }
+        }
+
+        if ("onload" in injection) {
+            i2d_onload(injection.onload);
+        }
+
+        if ("urls" in injection) {
+            for (var i = 0; i < injection.urls.length; i++) {
+                inject_url(injection.urls[i].regex, injection.urls[i].callback);
+            }
+        }
+    }
+
+    function do_all_injections() {
+        for (var i = 0; i < injections.length; i++) {
+            do_injection(injections[i]);
+        }
+
+        var win = get_window();
+        for (var key in props) {
+            defineprop(win, props, key);
+        }
+    }
+    do_all_injections();
+
+
+    /*window.addEventListener("afterscriptexecute", function(e) {
         i2d_main(e.target);
-    });
+    });*/
 
     var process_raw_tag = function(el) {
         var basename = "raw ";
@@ -1636,7 +1896,7 @@
 
     var process_el = function(el) {
         if (el.nodeName === "SCRIPT") {
-            i2d_main(el);
+            //i2d_main(el);
         } else if (el.nodeName === "VIDEO" ||
                    el.nodeName === "AUDIO") {
             process_raw_tag(el);
@@ -1659,8 +1919,9 @@
             }
             if (mutations[i].removedNodes) {
                 for (var x = 0; x < mutations[i].removedNodes.length; x++) {
-                    if (mutations[i].removedNodes[x].nodeName === "SCRIPT")
-                        i2d_main(mutations[i].removedNodes[x]);
+                    if (mutations[i].removedNodes[x].nodeName === "SCRIPT") {
+                        //i2d_main(mutations[i].removedNodes[x]);
+                    }
                 }
             }
         }
@@ -1726,6 +1987,6 @@
 
         //get_raws();
 
-        i2d_main();
+        //i2d_main();
     });
 })();
