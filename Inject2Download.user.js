@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Inject2Download
 // @namespace    http://lkubuntu.wordpress.com/
-// @version      0.4.0
+// @version      0.4.1
 // @description  Simple media download script
 // @author       Anonymous Meerkat
 // @include      *
@@ -54,7 +54,7 @@
         blacklist: {
             name: "Blacklisted domains (one per line)",
             type: "textarea",
-            default: ""
+            default: "translate.google.com"
         }
     };
 
@@ -1497,6 +1497,51 @@
                 }
             ]
         },
+        // Mixcloud
+        {
+            run_when: [{
+                host: "mixcloud.com"
+            }],
+            urls: [
+                {
+                    regex: /^(?:https?:\/\/www\.mixcloud\.com)?\/graphql(?:\?.*)?$/,
+                    callback: function(url) {
+                        var mixcloud_key = atob("SUZZT1VXQU5UVEhFQVJUSVNUU1RPR0VUUEFJRERPTk9URE9XTkxPQURGUk9NTUlYQ0xPVUQ=");
+                        var key_length = mixcloud_key.length;
+
+                        try {
+                            var parsed = this.response;
+                            var viewer = parsed.data.viewer;
+                            if (!viewer)
+                                viewer = parsed.data.changePlayerQueue.viewer;
+                            var queue = viewer.playerQueue;
+
+                            var cloudcast;
+                            if (queue.queue) {
+                                var currentIndex = 0;
+                                if (queue.currentIndex)
+                                    currentIndex = queue.currentIndex;
+                                cloudcast = queue.queue[currentIndex].cloudcast;
+                            }
+
+                            var info = cloudcast.streamInfo;
+                            for (var key in info) {
+                                var value = atob(info[key]);
+                                var newval = [];
+                                for (var i = 0; i < value.length; i++) {
+                                    newval[i] = value.charCodeAt(i) ^ mixcloud_key.charCodeAt(i % mixcloud_key.length);
+                                }
+                                var newvalue = String.fromCharCode.apply(String, newval);
+                                if (newvalue.match(/^https?:\/\//)) {
+                                    i2d_show_url("mixcloud", newvalue, "[" + key + "] " + cloudcast.slug);
+                                }
+                            }
+                        } catch (e) {
+                        }
+                    }
+                }
+            ]
+        },
         // Forvo
         {
             run_when: [{
@@ -1713,7 +1758,7 @@
             for (var proto in injection.proto) {
                 (function(proto) {
                     var context = {
-                        oldvariable: variable.prototype.proto,
+                        oldvariable: variable.prototype[proto],
                         oldvariablename: proto,
                         win: win
                     };
@@ -1725,7 +1770,7 @@
             }
         }
 
-        return oldvariable;
+        return variable;
     }
 
     function do_injection(injection) {
