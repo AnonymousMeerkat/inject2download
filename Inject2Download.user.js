@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Inject2Download
 // @namespace    http://lkubuntu.wordpress.com/
-// @version      0.4.2
+// @version      0.4.3
 // @description  Simple media download script
 // @author       Anonymous Meerkat
 // @include      *
@@ -1755,9 +1755,11 @@
                 return injection.replace.bind(this)(context, arguments);
             };
 
-            for (var key in variable.keys) {
+            for (var key in variable) {
                 result[key] = variable[key];
             }
+
+            return result;
         } else if ("proto" in injection) {
             for (var proto in injection.proto) {
                 (function(proto) {
