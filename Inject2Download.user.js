@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Inject2Download
 // @namespace    http://lkubuntu.wordpress.com/
-// @version      0.4.3
+// @version      0.4.4
 // @description  Simple media download script
 // @author       Anonymous Meerkat
 // @include      *
@@ -359,6 +359,7 @@
                 el.style.lineHeight = "normal";
                 el.style.textAlign = "left";
                 el.style.overflow = "scroll";
+                el.style.position = "absolute";
 
                 /*el.ondblclick = function() {
                   el.parentElement.removeChild(el);
@@ -423,7 +424,7 @@
                 eldiv.style.display = "block";
                 el.appendChild(eldiv);
                 el.insertBefore(eldivhold, el.firstChild);
-                document.body.appendChild(el);
+                document.documentElement.appendChild(el);
 
                 elspan.onclick = function() {
                     /*var el = document.getElementById("i2d-popup");
@@ -469,9 +470,9 @@
             //eldiv.innerHTML += text + "<a href='" + newurl + "' style='color:blue' title='" + newurl + "'>" + shorturl + "</a><br />";
 
             // XXX: why is this needed? test: http://playbb.me/embed.php?w=718&h=438&vid=at/nw/flying_witch_-_01.mp4, animeplus.tv
-            document.body.removeChild(el);
+            /*document.body.removeChild(el);
             el.style.position = "absolute";
-            document.body.appendChild(el);
+            document.body.appendChild(el);*/
 
             /*if (document.getElementById("i2d-popup-x"))
                 document.getElementById("i2d-popup-x").parentElement.removeChild(document.getElementById("i2d-popup-x"));*/
