@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Inject2Download
 // @namespace    http://lkubuntu.wordpress.com/
-// @version      0.4.4
+// @version      0.4.5
 // @description  Simple media download script
 // @author       Anonymous Meerkat
 // @include      *
@@ -54,7 +54,10 @@
         blacklist: {
             name: "Blacklisted domains (one per line)",
             type: "textarea",
-            default: "translate.google.com"
+            default: [
+                "translate.google.com", // Spams audio files
+                "docs.google.com"       // Conflicts with $f
+            ].join("\n")
         }
     };
 
@@ -246,6 +249,8 @@
         });
         did_prefs = true;
     }
+
+    check_blacklisted();
 
     // Helper functions
     function run_on_load(f) {
