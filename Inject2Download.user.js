@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Inject2Download
 // @namespace    http://lkubuntu.wordpress.com/
-// @version      0.4.6
+// @version      0.4.7
 // @description  Simple media download script
 // @author       Anonymous Meerkat
 // @include      *
@@ -1408,6 +1408,88 @@
                 return result;
             }
         },
+        // createjs.Sound
+        {
+            variables: {
+                window: "createjs.Sound.registerSound"
+            },
+            replace: function(context, args) {
+                var url = null;
+                var name = null;
+                if (typeof args[0] === "string")
+                    url = args[0];
+                else {
+                    url = args[0].src;
+                    if (args[0].id)
+                        name = args[0].id;
+                }
+
+                if (args[1] && typeof args[1] === "string")
+                    name = args[1];
+
+                i2d_show_url("createjs", url, name);
+
+                return context.oldvariable.apply(this, args);
+            }
+        },
+        // createjs.Sound (via queue)
+        {
+            variables: {
+                window: "createjs.LoadQueue"
+            },
+            common: {
+                checkArgs: function(args) {
+                    var url = null;
+                    var name = null;
+                    var type = null;
+
+                    if (typeof args[0] === "string")
+                        url = args[0];
+                    else {
+                        url = args[0].src;
+                        if (args[0].id)
+                            name = args[0].id;
+                        type = args[0].type;
+                    }
+
+                    if (args[1] && typeof args[1] === "string")
+                        name = args[1];
+
+                    if (!type) {
+                        var ext = url.replace(/.*\.([a-z0-9]+)(?:[?#&].*)?$/, "$1");
+                        if (!ext ||
+                            // https://github.com/CreateJS/PreloadJS/blob/fd0f5790a4940892fa19972d6214be36f58eec85/src/preloadjs/utils/RequestUtils.js#L100
+                            (ext !== "ogg" &&
+                             ext !== "mp3" &&
+                             ext !== "webm")) {
+                            type = null;
+                        } else {
+                            type = "sound";
+                        }
+                    }
+
+                    if (type === "sound")
+                        i2d_show_url("createjs", url, name);
+                }
+            },
+            proto: {
+                loadFile: function(context, args) {
+                    context.common.checkArgs(args);
+                    return context.oldvariable.apply(this, args);
+                },
+                loadManifest: function(context, args) {
+                    if (args[0] instanceof Array) {
+                        for (var i = 0; i < args[0].length; i++) {
+                            context.common.checkArgs([args[0][i]]);
+                        }
+                    } else {
+                        context.common.checkArgs(args);
+                    }
+
+                    return context.oldvariable.apply(this, args);
+                }
+            }
+        },
         // DASH.js
         {
             variables: {
@@ -1793,7 +1875,8 @@
             var context = {
                 oldvariable: variable,
                 oldvariablename: variablename,
-                win: win
+                win: win,
+                common: injection.common
             };
 
             var result = function() {
@@ -1811,7 +1894,8 @@
                     var context = {
                         oldvariable: variable.prototype[proto],
                         oldvariablename: proto,
-                        win: win
+                        win: win,
+                        common: injection.common
                     };
 
                     variable.prototype[proto] = function() {
