@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Inject2Download
 // @namespace    http://lkubuntu.wordpress.com/
-// @version      0.4.5
+// @version      0.4.6
 // @description  Simple media download script
 // @author       Anonymous Meerkat
 // @include      *
@@ -55,8 +55,7 @@
             name: "Blacklisted domains (one per line)",
             type: "textarea",
             default: [
-                "translate.google.com", // Spams audio files
-                "docs.google.com"       // Conflicts with $f
+                "translate.google.com" // Spams audio files
             ].join("\n")
         }
     };
@@ -779,6 +778,21 @@
     if (blacklisted)
         return;
 
+    var injected = [];
+    var defineProp = Object.defineProperty;
+    win.Object.defineProperty = function() {
+        if (arguments[0] === win &&
+            injected.indexOf(arguments[1]) >= 0) {
+            console.log("[i2d] Intercepted Object.defineProperty for " + arguments[1]);
+
+            if (arguments[2] && arguments[2].value)
+                win[arguments[1]] = arguments[2].value;
+
+            return;
+        }
+
+        return defineProp.apply(this, arguments);
+    };
 
     var injections = [
         // soundManager
@@ -915,6 +929,11 @@
         {
             variables: {
                 window: ["flowplayer", "$f"]
+            },
+            check: function(variable) {
+                if (!variable.version)
+                    return false;
+                return true;
             },
             replace: function(context, args) {
                 var obj_baseurl = null;
@@ -1713,6 +1732,12 @@
 
         if (!our_prop.$$INJECTED) {
             if (our_obj !== undefined) {
+                if (our_prop.$$CHECK) {
+                    if (!our_prop.$$CHECK(our_obj)) {
+                        return;
+                    }
+                }
+
                 if (our_prop.$$PROCESS) {
                     lastobj_win[oursplit] = our_prop.$$PROCESS(our_obj);
                     our_obj = lastobj_win[oursplit];
@@ -1722,7 +1747,7 @@
             }
 
             try {
-                Object.defineProperty(lastobj_win, oursplit, {
+                defineProp(lastobj_win, oursplit, {
                     get: function() {
                         return our_obj;
                     },
@@ -1747,7 +1772,21 @@
         }
     }
 
+    function check_injection(injection, variable, variablename) {
+        if ("check" in injection) {
+            if (!injection.check(variable)) {
+                console.log("[i2d] Not injecting " + variablename);
+                return false;
+            }
+        }
+
+        return true;
+    }
+
     function apply_injection(injection, variable, variablename, win) {
+        if (!check_injection(injection, variable, variablename))
+            return variable;
+
         console.log("[i2d] Injecting " + variablename);
 
         if ("replace" in injection) {
@@ -1817,8 +1856,14 @@
                     var dotsplit = varname.split(".");
                     var lastobj = win;
 
+                    injected.push(dotsplit[0]);
+
                     var process = function(v) {
                         return apply_injection(injection, v, dotsplit[dotsplit.length - 1], win);
+                    };
+
+                    var check = function(v) {
+                        return check_injection(injection, v, dotsplit[dotsplit.length - 1]);
                     };
 
                     var lastprop = props;
@@ -1831,6 +1876,7 @@
 
                         if (x === dotsplit.length - 1) {
                             lastprop[oursplit].$$PROCESS = process;
+                            lastprop[oursplit].$$CHECK = check;
                         }
 
                         lastprop = lastprop[oursplit];
