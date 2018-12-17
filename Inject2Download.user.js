@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Inject2Download
 // @namespace    http://lkubuntu.wordpress.com/
-// @version      0.4.7
+// @version      0.4.8
 // @description  Simple media download script
 // @author       Anonymous Meerkat
 // @include      *
@@ -55,7 +55,8 @@
             name: "Blacklisted domains (one per line)",
             type: "textarea",
             default: [
-                "translate.google.com" // Spams audio files
+                "translate.google.com", // Spams audio files
+                "live.com"              // Conflicts with $f
             ].join("\n")
         }
     };
@@ -794,6 +795,32 @@
         return defineProp.apply(this, arguments);
     };
 
+    var defineProps = Object.defineProperties;
+    win.Object.defineProperties = function() {
+        if (arguments[0] === win) {
+            var keys = Object.keys(arguments[1]);
+
+            var newargs = [];
+            newargs[0] = arguments[0];
+            newargs[1] = {};
+
+            for (var i = 0; i < keys.length; i++) {
+                if (injected.indexOf(keys[i]) >= 0) {
+                    console.log("[i2d] Intercepted Object.defineProperties for " + keys[i]);
+                    if (arguments[1][keys[i]] && arguments[1][keys[i]].value) {
+                        win[keys[i]] = arguments[1][keys[i]].value;
+                    }
+                } else {
+                    newargs[1][keys[i]] = arguments[1][keys[i]];
+                }
+            }
+
+            return defineProps.apply(this, newargs);
+        }
+
+        return defineProps.apply(this, arguments);
+    };
+
     var injections = [
         // soundManager
         {
@@ -928,10 +955,11 @@
         // flowplayer
         {
             variables: {
-                window: ["flowplayer", "$f"]
+                window: ["flowplayer"],
+                window_alias: ["$f"]
             },
             check: function(variable) {
-                if (!variable.version)
+                if (!variable || !variable.version)
                     return false;
                 return true;
             },
@@ -1271,18 +1299,51 @@
                     }
                 }
 
+                var parse_obj = function(obj) {
+                    if (obj instanceof Array) {
+                        for (var i = 0; i < obj.length; i++) {
+                            parse_obj(obj[i]);
+                        }
+                    } else if (typeof obj === "string") {
+                        // TODO
+                    } else if (typeof obj === "object") {
+                        if ("src" in obj) {
+                            var type;
+                            if ("type" in obj) {
+                                type = obj.type;
+                            }
+
+                            i2d_show_url("videojs", obj.src, type);
+                        }
+
+                        if ("sources" in obj) {
+                            parse_obj(obj.sources);
+                        }
+                    }
+                };
+
                 var result = context.oldvariable.apply(this, args);
 
                 var old_videojs_src = result.src;
                 result.src = function() {
                     if (arguments.length > 0 && typeof arguments[0] === "object") {
-                        if ("src" in arguments[0]) {
+                        /*if ("src" in arguments[0]) {
                             i2d_show_url("videojs", arguments[0].src);
-                        }
+                            }*/
+                        parse_obj(arguments[0]);
                     }
 
                     return old_videojs_src.apply(this, arguments);
                 };
+
+                var old_videojs_playlist = result.playlist;
+                result.playlist = function() {
+                    if (arguments.length > 0) {
+                        parse_obj(arguments[0]);
+                    }
+
+                    return old_videojs_playlist.apply(this, arguments);
+                }
 
                 return result;
             }
@@ -1791,6 +1852,7 @@
     var props = {};
 
     function defineprop(lastobj_win, lastobj_props, oursplit) {
+        // TODO: Implement window_alias
         if (!lastobj_win || !lastobj_props) {
             console.log("lastobj_win === null || lastobj_props === null");
             return;
